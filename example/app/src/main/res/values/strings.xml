@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MyTaxi</string>
+    <string name="location_do_not_available">Не удалось получить GPS-координаты</string>
+    <string name="you_are_here">Вы здесь</string>
+</resources>
