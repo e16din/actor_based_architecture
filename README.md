@@ -3,5 +3,5 @@
 
 [Статья с примером](article_with_example.md)
 
-[Пример Android-приложения - MyTaxi](https://github.com/e16din/actor_based_architecture/tree/main/example)
+[Пример Android-приложения - MyTaxi (см. папку example)](https://github.com/e16din/actor_based_architecture)
 
