@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:background="@color/white"
+    android:clickable="true"
+    android:focusable="true"
+    android:orientation="vertical"
+    android:visibility="gone"
+    tools:showIn="@layout/fragment_main">
+
+    <TextView
+        android:id="@+id/startPlaceButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:drawablePadding="16dp"
+        android:padding="18dp"
+        android:paddingStart="32dp"
+        android:textColor="@color/black"
+        android:textSize="18sp"
+        app:drawableLeftCompat="@drawable/ic_red_dot"
+        tools:text="Откуда" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:layout_gravity="right|center_vertical"
+        android:layout_marginStart="24dp"
+        android:background="@color/separator_gray" />
+
+    <TextView
+        android:id="@+id/finishPlaceButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:drawablePadding="16dp"
+        android:padding="18dp"
+        android:paddingStart="32dp"
+        android:textColor="@color/black"
+        android:textSize="18sp"
+        app:drawableLeftCompat="@drawable/ic_gray_dot"
+        tools:text="Куда" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:layout_gravity="right|center_vertical"
+        android:layout_marginStart="24dp"
+        android:background="@color/separator_gray" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/servicesList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        tools:minHeight="80dp" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:layout_gravity="right|center_vertical"
+        android:background="@color/separator_gray" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#FFF3E0">
+
+        <TextView
+            android:id="@+id/orderButton"
+            android:layout_width="320dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="16dp"
+            android:background="@drawable/yellow_rounded_shape"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:maxWidth="320dp"
+            android:padding="18dp"
+            android:paddingStart="32dp"
+            android:text="@string/order"
+            android:textColor="@color/black"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </FrameLayout>
+
+</LinearLayout>
+
+        
