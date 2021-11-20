@@ -52,110 +52,164 @@
 Давайте посмотрим на пример кода экрана приложения такси:
 
 ```kotlin
-class MainFragment : Fragment(), Screen {
+class MainFragment : Fragment(), DataKey {
 
+    // NOTE: агент для актора работающего приожения
     inner class AppAgent {
-        private val gson = Gson()
-
-        var isAuthorized: Boolean = false
-            // ...
-
-        var lastLocation: Location? = null
-            // ...
-
         // ...
     }
 
-    inner class UserAgent {
-        fun lookAtMap(location: Location) {
-            // ...
-        }
-
-        fun lookAtActionsBottomSheet() {
-            // ...
-        }
-
-        fun lookAtBonusesCount(bonusesCount: Int) {
-            // ...
-        }
-
-        fun lookAtSideBar(sidebarOpened: Boolean) {
-            // ...
-        }
-
-        fun lookAtLocationDoNotAvailableMessage() {
-            // ...
-        }
-    }
-
-    inner class ServerAgent {
-        suspend fun getBonusesCount(): Int? {
-           // ...
-        }
-    }
-
-    inner class SystemAgent {
-        var lastLocation: Location? = null
-
-        fun trackLocation() {
-            // ...
-        }
-    }
-
-    @Parcelize
+    @Serializable
     class MainScreenData(
         var bonusesCount: Int = 0,
-        var isSideBarOpened: Boolean = false
-    ) : Parcelable
+        var isSideBarOpened: Boolean = false,
+        var selectedRoute: Route = Route(),
+        var lastPlaces: List<Place> = emptyList(),
+        var services: List<Service> = emptyList(),
+        var selectedService: Service? = null,
+        var screenState: ScreenState = ScreenState.ToSelectRoute,
+        var orderedCar: OrderResult.Car? = null
+    ) : java.io.Serializable {
+
+        enum class ScreenState {
+            ToSelectRoute,
+            ToOrderService,
+            ToSearchCar, //todo: InProgress, Success, Fail
+            ToWaitForCar, //todo: Await, Done, Canceled
+            ToTrackTrip, //todo: Await, Done, Canceled
+            ToRateService //todo: add rate screen
+        }
+    }
+
+    // NOTE: агент для актора главного экрана
+    inner class MainScreenAgent {
+        lateinit var data: MainScreenData
+    }
+
+    // NOTE: агент для актора экрана выбора маршрута
+    inner class SelectRouteScreenAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора пользователя
+    inner class UserAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора сервера
+    inner class ServerAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора операционной системы телефона
+    inner class SystemAgent {
+        // ...
+    }
 
     private val appAgent = AppAgent()
+    private val screenAgent = MainScreenAgent()
+    private val selectRouteScreenAgent = SelectRouteScreenAgent()
     private val userAgent = UserAgent()
     private val systemAgent = SystemAgent()
     private val serverAgent = ServerAgent()
 
+    private lateinit var binding: FragmentMainBinding
+
+
+    init {
+        systemAgent.onCreateView = {
+            systemAgent.trackLocation { location ->
+                appAgent.lastLocation = location
+            }
+        }
+
+        systemAgent.onViewCreated = { savedInstanceState ->
+            screenAgent.data = systemAgent.restoreData(savedInstanceState)
+                ?: MainScreenData()
+
+            when (screenAgent.data.screenState) {
+                MainScreenData.ScreenState.ToSelectRoute -> {
+                    switchToSelectRouteState()
+                }
+                MainScreenData.ScreenState.ToOrderService -> {
+                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                }
+                MainScreenData.ScreenState.ToSearchCar -> {
+                    screenAgent.data.selectedService?.let {
+                        switchToSearchCarState(it)
+                    }
+                }
+                MainScreenData.ScreenState.ToWaitForCar -> {
+                    switchToWaitForCarState()
+                }
+                MainScreenData.ScreenState.ToTrackTrip -> {
+                    // todo:
+                }
+                MainScreenData.ScreenState.ToRateService -> {
+                    // todo:
+                }
+            }
+
+            userAgent.lookAtLeftSideBar(
+                sidebarOpened = screenAgent.data.isSideBarOpened,
+                onSideBarStateChanged = { opened ->
+                    screenAgent.data.isSideBarOpened = opened
+                }
+            )
+
+            lifecycleScope.launch {
+                val lastPlaces = serverAgent.getLastPlaces(2)
+                    ?: screenAgent.data.lastPlaces
+
+                fun onLastPlaceClick(position: Int) {
+                    screenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
+                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                }
+
+                userAgent.lookAtLastPlacesList(
+                    lastPlaces = lastPlaces,
+                    onLastPlace1Click = { onLastPlaceClick(0) },
+                    onLastPlace2Click = { onLastPlaceClick(1) }
+                )
+
+                screenAgent.data.bonusesCount = serverAgent.getBonusesCount()
+                    ?: screenAgent.data.bonusesCount
+                userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
+            }
+
+            systemAgent.onSaveInstanceState = { outState ->
+                systemAgent.saveData(outState)
+            }
+        }
+    }
+
     // ...
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        systemAgent.trackLocation()
-
-        binding = FragmentMainBinding.inflate(inflater)
-        return binding.root
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        savedInstanceState?.getParcelable<MainScreenData>(screenDataKey)?.let {
-            screenData = it
-        }
-
-        val lastLocation = systemAgent.lastLocation
-            ?: appAgent.lastLocation
-        lastLocation?.let {
-            userAgent.lookAtMap(lastLocation)
-        } ?: run {
-            userAgent.lookAtLocationDoNotAvailableMessage()
-        }
-
-        userAgent.lookAtActionsBottomSheet()
-        userAgent.lookAtSideBar(screenData.isSideBarOpened)
+    private fun switchToOrderServiceState(route: Route) {
+        screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
+        userAgent.lookAtRouteLine(screenAgent.data.selectedRoute)
+        userAgent.lookAtOrderArea()
+        userAgent.lookAtOrderRouteFields(route)
 
         lifecycleScope.launch {
-            screenData.bonusesCount = serverAgent.getBonusesCount()
-                ?: screenData.bonusesCount
-            userAgent.lookAtBonusesCount(screenData.bonusesCount)
+            screenAgent.data.services = serverAgent.getServices()
+            userAgent.lookAtServices(screenAgent.data.services)
+            userAgent.lookAtOrderButton(
+                service = screenAgent.data.selectedService,
+                onOrderClick = { service ->
+                    switchToSearchCarState(service)
+                }
+            )
         }
     }
-    
+
     // ...
 }
 ```
 
-Обратите внимание что основная бизнес-логика находится в блоке onViewCreated(), а реализация в классах агентов.
+Обратите внимание что вся логика находится в блоке init {}, а реализация в классах агентов.
 
-В каждом классе агенте содержатся публичные функции, и каждая из них является своего рода интерактором, юзкейсом. 
+В каждом классе агенте содержатся публичные функции и каждая из них является своего рода интерактором/юзкейсом. 
 
 Если присмотреться то получается довольно чистая архитектура :)
 
