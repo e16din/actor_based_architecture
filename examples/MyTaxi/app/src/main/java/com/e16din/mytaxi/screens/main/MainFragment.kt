@@ -35,7 +35,6 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import com.google.android.gms.maps.model.PolylineOptions
-import io.ktor.client.features.websocket.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -232,7 +231,7 @@ class MainFragment : Fragment(), DataKey {
         }
 
         fun lookAtLeftSideBar(
-            sidebarOpened: Boolean,
+            enabled: Boolean,
             onSideBarStateChanged: (opened: Boolean) -> Unit
         ) {
             binding.drawer.addDrawerListener(object : DrawerLayout.DrawerListener {
@@ -251,11 +250,11 @@ class MainFragment : Fragment(), DataKey {
                 }
             })
 
-            if (sidebarOpened) {
-                binding.drawer.close()
+            if (enabled) {
+                binding.drawer.openDrawer(Gravity.LEFT)
 
             } else {
-                binding.drawer.openDrawer(Gravity.LEFT)
+                binding.drawer.close()
             }
         }
 
@@ -475,7 +474,7 @@ class MainFragment : Fragment(), DataKey {
             }
 
             userAgent.lookAtLeftSideBar(
-                sidebarOpened = screenAgent.data.isSideBarOpened,
+                enabled = screenAgent.data.isSideBarOpened,
                 onSideBarStateChanged = { opened ->
                     screenAgent.data.isSideBarOpened = opened
                 }
