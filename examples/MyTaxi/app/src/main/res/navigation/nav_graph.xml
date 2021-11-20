@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@+id/mainFragment">
+
+    <fragment
+        android:id="@+id/mainFragment"
+        android:name="com.e16din.mytaxi.screens.main.MainFragment"
+        android:label="Book Search Fragment"
+        tools:layout="@layout/fragment_main">
+        <action
+            android:id="@+id/select_route_fragment"
+            app:destination="@+id/navigateTo_SelectRouteFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/selectRouteFragment"
+        android:name="com.e16din.mytaxi.screens.main.MainFragment"
+        android:label="Book Search Fragment"
+        tools:layout="@layout/fragment_select_route">
+        <action
+            android:id="@+id/action_main_fragment"
+            app:destination="@+id/mainFragment"
+            app:popUpTo="@+id/mainFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+</navigation>
