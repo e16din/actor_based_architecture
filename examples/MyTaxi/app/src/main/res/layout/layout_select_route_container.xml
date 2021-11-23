@@ -31,7 +31,7 @@
             android:textColor="@color/black"
             android:textSize="18sp"
             android:textStyle="bold"
-            tools:text="Куда едем?" />
+            android:text="Куда едем?" />
 
         <View
             android:layout_width="1dp"

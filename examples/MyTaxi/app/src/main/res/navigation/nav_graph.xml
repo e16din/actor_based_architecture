@@ -8,17 +8,17 @@
     <fragment
         android:id="@+id/mainFragment"
         android:name="com.e16din.mytaxi.screens.main.MainFragment"
-        android:label="Book Search Fragment"
+        android:label="MainFragment"
         tools:layout="@layout/fragment_main">
         <action
-            android:id="@+id/select_route_fragment"
-            app:destination="@+id/navigateTo_SelectRouteFragment" />
+            android:id="@+id/action_select_route_fragment"
+            app:destination="@+id/selectRouteFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/selectRouteFragment"
-        android:name="com.e16din.mytaxi.screens.main.MainFragment"
-        android:label="Book Search Fragment"
+        android:name="com.e16din.mytaxi.screens.main.SelectRouteFragment"
+        android:label="SelectRouteFragment"
         tools:layout="@layout/fragment_select_route">
         <action
             android:id="@+id/action_main_fragment"

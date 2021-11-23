@@ -1,14 +1,12 @@
 package com.e16din.mytaxi.screens.main
 
 import android.os.Bundle
-import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.e16din.mytaxi.MyTaxiApp
 import com.e16din.mytaxi.databinding.FragmentSelectRouteBinding
 import com.e16din.mytaxi.server.HttpClient
 import com.e16din.mytaxi.server.Place
@@ -16,7 +14,6 @@ import com.e16din.mytaxi.support.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.coroutines.launch
-import kotlinx.parcelize.Parcelize
 import java.io.Serializable
 
 
@@ -33,17 +30,19 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     class SelectRouteScreenData(
         var route: Route,
+        var currentPlaceQuery: String = ""
     ) : Serializable
 
-    // NOTE: агент для актора экрана
+    // NOTE: агент для актора экрана Select Route
     inner class SelectRouteScreenAgent {
         lateinit var data: SelectRouteScreenData
+    }
 
-        fun saveData(outState: Bundle) {
-            outState.putSerializable(dataKey, screenAgent.data)
+    // NOTE: агент для актора экрана Main
+    inner class MainScreenAgent {
+        fun getSelectedRoute(): Route {
+            return requireArguments().getSerializable(KEY_INITIAL_DATA)!! as Route
         }
-
-        var currentPlaceQuery = ""
     }
 
     // NOTE: агент для актора реального пользователя
@@ -82,27 +81,36 @@ class SelectRouteFragment : Fragment(), DataKey {
     }
 
     // NOTE: агент для актора операционной системы телефона
-    inner class SystemAgent {
+    inner class DeviceAgent {
         lateinit var onCreateView: () -> Unit
         lateinit var onViewCreated: (savedInstanceState: Bundle?) -> Unit
         lateinit var onSaveInstanceState: (outState: Bundle) -> Unit
+
+        fun restoreData(savedInstanceState: Bundle?): SelectRouteScreenData? {
+            return savedInstanceState?.getSerializable(dataKey) as SelectRouteScreenData?
+        }
+
+        fun saveData(outState: Bundle) {
+            outState.putSerializable(dataKey, screenAgent.data)
+        }
     }
 
     private val appAgent = AppAgent()
     private val screenAgent = SelectRouteScreenAgent()
+    private val mainScreenAgent = MainScreenAgent()
     private val userAgent = UserAgent()
-    private val systemAgent = SystemAgent()
+    private val deviceAgent = DeviceAgent()
     private val serverAgent = ServerAgent()
 
     private lateinit var binding: FragmentSelectRouteBinding
 
     init {
-        systemAgent.onCreateView = {
+        deviceAgent.onCreateView = {
             // do nothing
         }
-        systemAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = savedInstanceState?.getParcelable(dataKey)
-                ?: requireArguments().getParcelable(KEY_INITIAL_DATA)!!
+        deviceAgent.onViewCreated = { savedInstanceState ->
+            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
+                ?: SelectRouteScreenData(route = mainScreenAgent.getSelectedRoute())
 
             val route = screenAgent.data.route
             userAgent.lookAtStartPlace(route.startPlace?.name)
@@ -118,17 +126,17 @@ class SelectRouteFragment : Fragment(), DataKey {
             }
 
             lifecycleScope.launch {
-                val places = serverAgent.getPlaces(screenAgent.currentPlaceQuery)
+                val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
                 userAgent.lookAtPlacesList(places)
             }
         }
-        systemAgent.onSaveInstanceState = { outState ->
-            screenAgent.saveData(outState)
+        deviceAgent.onSaveInstanceState = { outState ->
+            deviceAgent.saveData(outState)
         }
     }
 
     private fun onAnyPlaceChanged(placeName: String) {
-        screenAgent.currentPlaceQuery = placeName
+        screenAgent.data.currentPlaceQuery = placeName
 
         val areAllPlacesSelected = screenAgent.data.route.finishPlace != null
                 && screenAgent.data.route.startPlace != null
@@ -141,18 +149,18 @@ class SelectRouteFragment : Fragment(), DataKey {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        systemAgent.onCreateView.invoke()
+        deviceAgent.onCreateView.invoke()
         binding = FragmentSelectRouteBinding.inflate(inflater)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        systemAgent.onViewCreated.invoke(savedInstanceState)
+        deviceAgent.onViewCreated.invoke(savedInstanceState)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        systemAgent.onSaveInstanceState.invoke(outState)
+        deviceAgent.onSaveInstanceState.invoke(outState)
         super.onSaveInstanceState(outState)
     }
 }

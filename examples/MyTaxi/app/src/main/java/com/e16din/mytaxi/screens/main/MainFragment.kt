@@ -123,7 +123,7 @@ class MainFragment : Fragment(), DataKey {
                 onTheSelectRouteScreenResponse.invoke(newRoute)
             }
             val bundle = bundleOf(SelectRouteFragment.INITIAL_DATA to route)
-            navController.navigate(R.id.navigateTo_SelectRouteFragment, bundle)
+            navController.navigate(R.id.action_select_route_fragment, bundle)
         }
     }
 
@@ -387,8 +387,8 @@ class MainFragment : Fragment(), DataKey {
         }
     }
 
-    // NOTE: агент для актора операционной системы телефона
-    inner class SystemAgent {
+    // NOTE: агент для актора устройства
+    inner class DeviceAgent {
         lateinit var onCreateView: () -> Unit
         lateinit var onViewCreated: (savedInstanceState: Bundle?) -> Unit
         lateinit var onSaveInstanceState: (outState: Bundle) -> Unit
@@ -434,20 +434,20 @@ class MainFragment : Fragment(), DataKey {
     private val screenAgent = MainScreenAgent()
     private val selectRouteScreenAgent = SelectRouteScreenAgent()
     private val userAgent = UserAgent()
-    private val systemAgent = SystemAgent()
+    private val deviceAgent = DeviceAgent()
     private val serverAgent = ServerAgent()
 
     private lateinit var binding: FragmentMainBinding
 
     init {
-        systemAgent.onCreateView = {
-            systemAgent.trackLocation { location ->
+        deviceAgent.onCreateView = {
+            deviceAgent.trackLocation { location ->
                 appAgent.lastLocation = location
             }
         }
 
-        systemAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = systemAgent.restoreData(savedInstanceState)
+        deviceAgent.onViewCreated = { savedInstanceState ->
+            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
                 ?: MainScreenData()
 
             when (screenAgent.data.screenState) {
@@ -500,8 +500,8 @@ class MainFragment : Fragment(), DataKey {
                 userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
             }
 
-            systemAgent.onSaveInstanceState = { outState ->
-                systemAgent.saveData(outState)
+            deviceAgent.onSaveInstanceState = { outState ->
+                deviceAgent.saveData(outState)
             }
         }
     }
@@ -567,6 +567,7 @@ class MainFragment : Fragment(), DataKey {
 
     private fun switchToSelectRouteState() {
         screenAgent.data.screenState = MainScreenData.ScreenState.ToSelectRoute
+
         appAgent.lastLocation?.let { lastLocation ->
             userAgent.lookAtYourLocation(lastLocation)
 
@@ -598,18 +599,18 @@ class MainFragment : Fragment(), DataKey {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        systemAgent.onCreateView.invoke()
+        deviceAgent.onCreateView.invoke()
         binding = FragmentMainBinding.inflate(inflater)
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        systemAgent.onViewCreated.invoke(savedInstanceState)
+        deviceAgent.onViewCreated.invoke(savedInstanceState)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        systemAgent.onSaveInstanceState.invoke(outState)
+        deviceAgent.onSaveInstanceState.invoke(outState)
         super.onSaveInstanceState(outState)
     }
 }
