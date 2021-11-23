@@ -44,6 +44,190 @@ import kotlinx.serialization.json.Json
 //todo: check on memory leaks with LeakCanary
 class MainFragment : Fragment(), DataKey {
 
+    private val appAgent = AppAgent()
+    private val screenAgent = MainScreenAgent()
+    private val selectRouteScreenAgent = SelectRouteScreenAgent()
+    private val userAgent = UserAgent()
+    private val deviceAgent = DeviceAgent()
+    private val serverAgent = ServerAgent()
+
+    private lateinit var binding: FragmentMainBinding
+
+    init {
+        deviceAgent.onCreateView = {
+            deviceAgent.trackLocation { location ->
+                appAgent.lastLocation = location
+            }
+        }
+
+        deviceAgent.onViewCreated = { savedInstanceState ->
+            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
+                ?: MainScreenData()
+
+            when (screenAgent.data.screenState) {
+                MainScreenData.ScreenState.ToSelectRoute -> {
+                    switchToSelectRouteState()
+                }
+                MainScreenData.ScreenState.ToOrderService -> {
+                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                }
+                MainScreenData.ScreenState.ToSearchCar -> {
+                    screenAgent.data.selectedService?.let {
+                        switchToSearchCarState(it)
+                    }
+                }
+                MainScreenData.ScreenState.ToWaitForCar -> {
+                    switchToWaitForCarState()
+                }
+                MainScreenData.ScreenState.ToTrackTrip -> {
+                    // todo:
+                }
+                MainScreenData.ScreenState.ToRateService -> {
+                    // todo:
+                }
+            }
+
+            userAgent.lookAtLeftSideBar(
+                enabled = screenAgent.data.isSideBarOpened,
+                onSideBarStateChanged = { opened ->
+                    screenAgent.data.isSideBarOpened = opened
+                }
+            )
+
+            lifecycleScope.launch {
+                val lastPlaces = serverAgent.getLastPlaces(2)
+                    ?: screenAgent.data.lastPlaces
+
+                fun onLastPlaceClick(position: Int) {
+                    screenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
+                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                }
+
+                userAgent.lookAtLastPlacesList(
+                    lastPlaces = lastPlaces,
+                    onLastPlace1Click = { onLastPlaceClick(0) },
+                    onLastPlace2Click = { onLastPlaceClick(1) }
+                )
+
+                screenAgent.data.bonusesCount = serverAgent.getBonusesCount()
+                    ?: screenAgent.data.bonusesCount
+                userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
+            }
+
+            deviceAgent.onSaveInstanceState = { outState ->
+                deviceAgent.saveData(outState)
+            }
+        }
+    }
+
+    private fun switchToWaitForCarState() {
+        screenAgent.data.screenState = MainScreenData.ScreenState.ToWaitForCar
+        userAgent.lookAtWaitForCarArea()
+        lifecycleScope.launch {
+            serverAgent.listenCarDataChanged { carData ->
+                userAgent.lookAtWaitingTimeLabel(carData.waitingTimeMinutes)
+                val orderedCar = screenAgent.data.orderedCar
+                val characteristics =
+                    "${orderedCar?.carColor} ${orderedCar?.carModel} [${orderedCar?.carNumber}]"
+                userAgent.lookAtCarCharacteristics(characteristics)
+                userAgent.lookAtCarLocation(carData.carLocation)
+
+                val routeToMe = Route(
+                    startPlace = Place("carLocation", carData.carLocation),
+                    finishPlace = screenAgent.data.selectedRoute.startPlace
+                )
+                userAgent.lookAtRouteLine(routeToMe)
+            }
+        }
+    }
+
+    private fun switchToSearchCarState(service: Service) {
+        screenAgent.data.screenState = MainScreenData.ScreenState.ToSearchCar
+        var job: Job? = null
+        userAgent.lookAtSearchCarArea(onCancelClick = {
+            if (job?.isActive == true) {
+                job?.cancel()
+            }
+            switchToOrderServiceState(screenAgent.data.selectedRoute)
+        })
+        job = lifecycleScope.launch {
+            val response = serverAgent.postOrder(service)
+            if (response.success) {
+                screenAgent.data.orderedCar = response.car
+                switchToWaitForCarState()
+            } else {
+                userAgent.lookAtSearchResultMessage(response.message)
+            }
+        }
+    }
+
+    private fun switchToOrderServiceState(route: Route) {
+        screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
+        userAgent.lookAtRouteLine(screenAgent.data.selectedRoute)
+        userAgent.lookAtOrderArea()
+        userAgent.lookAtOrderRouteFields(route)
+
+        lifecycleScope.launch {
+            screenAgent.data.services = serverAgent.getServices()
+            userAgent.lookAtServices(screenAgent.data.services)
+            userAgent.lookAtOrderButton(
+                service = screenAgent.data.selectedService,
+                onOrderClick = { service ->
+                    switchToSearchCarState(service)
+                }
+            )
+        }
+    }
+
+    private fun switchToSelectRouteState() {
+        screenAgent.data.screenState = MainScreenData.ScreenState.ToSelectRoute
+
+        appAgent.lastLocation?.let { lastLocation ->
+            userAgent.lookAtYourLocation(lastLocation)
+
+        } ?: run {
+            userAgent.lookAtLocationDoNotAvailableMessage()
+        }
+
+        val placeName = screenAgent.data.selectedRoute.startPlace?.name
+            ?: "???"
+
+        val onSelectPlaceClick = {
+            selectRouteScreenAgent.startScreen(
+                route = screenAgent.data.selectedRoute,
+                onTheSelectRouteScreenResponse = { route ->
+                    if (route.startPlace != null && route.finishPlace != null) {
+                        switchToOrderServiceState(route)
+                    }
+                }
+            )
+        }
+        userAgent.lookAtStartPlaceLabel(
+            placeName = placeName,
+            onSelectPlaceClick = onSelectPlaceClick
+        )
+        userAgent.lookAtSelectRouteArea(onSelectPlaceClick)
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        deviceAgent.onCreateView.invoke()
+        binding = FragmentMainBinding.inflate(inflater)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        deviceAgent.onViewCreated.invoke(savedInstanceState)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        deviceAgent.onSaveInstanceState.invoke(outState)
+        super.onSaveInstanceState(outState)
+    }
+
     // NOTE: агент для актора работающего приожения
     inner class AppAgent {
         var isAuthorized: Boolean = false // todo: use it on order the car
@@ -117,12 +301,12 @@ class MainFragment : Fragment(), DataKey {
             val navController = findNavController()
             val savedStateLiveData =
                 navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Route>(
-                    SelectRouteFragment.RESULT_DATA
+                    SelectRouteFragment.KEY_RESULT_DATA
                 )
             savedStateLiveData?.observe(viewLifecycleOwner) { newRoute ->
                 onTheSelectRouteScreenResponse.invoke(newRoute)
             }
-            val bundle = bundleOf(SelectRouteFragment.INITIAL_DATA to route)
+            val bundle = bundleOf(SelectRouteFragment.KEY_INITIAL_DATA to route)
             navController.navigate(R.id.action_select_route_fragment, bundle)
         }
     }
@@ -428,189 +612,5 @@ class MainFragment : Fragment(), DataKey {
         fun saveData(bundle: Bundle) {
             bundle.putSerializable(dataKey, screenAgent.data)
         }
-    }
-
-    private val appAgent = AppAgent()
-    private val screenAgent = MainScreenAgent()
-    private val selectRouteScreenAgent = SelectRouteScreenAgent()
-    private val userAgent = UserAgent()
-    private val deviceAgent = DeviceAgent()
-    private val serverAgent = ServerAgent()
-
-    private lateinit var binding: FragmentMainBinding
-
-    init {
-        deviceAgent.onCreateView = {
-            deviceAgent.trackLocation { location ->
-                appAgent.lastLocation = location
-            }
-        }
-
-        deviceAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
-                ?: MainScreenData()
-
-            when (screenAgent.data.screenState) {
-                MainScreenData.ScreenState.ToSelectRoute -> {
-                    switchToSelectRouteState()
-                }
-                MainScreenData.ScreenState.ToOrderService -> {
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
-                }
-                MainScreenData.ScreenState.ToSearchCar -> {
-                    screenAgent.data.selectedService?.let {
-                        switchToSearchCarState(it)
-                    }
-                }
-                MainScreenData.ScreenState.ToWaitForCar -> {
-                    switchToWaitForCarState()
-                }
-                MainScreenData.ScreenState.ToTrackTrip -> {
-                    // todo:
-                }
-                MainScreenData.ScreenState.ToRateService -> {
-                    // todo:
-                }
-            }
-
-            userAgent.lookAtLeftSideBar(
-                enabled = screenAgent.data.isSideBarOpened,
-                onSideBarStateChanged = { opened ->
-                    screenAgent.data.isSideBarOpened = opened
-                }
-            )
-
-            lifecycleScope.launch {
-                val lastPlaces = serverAgent.getLastPlaces(2)
-                    ?: screenAgent.data.lastPlaces
-
-                fun onLastPlaceClick(position: Int) {
-                    screenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
-                }
-
-                userAgent.lookAtLastPlacesList(
-                    lastPlaces = lastPlaces,
-                    onLastPlace1Click = { onLastPlaceClick(0) },
-                    onLastPlace2Click = { onLastPlaceClick(1) }
-                )
-
-                screenAgent.data.bonusesCount = serverAgent.getBonusesCount()
-                    ?: screenAgent.data.bonusesCount
-                userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
-            }
-
-            deviceAgent.onSaveInstanceState = { outState ->
-                deviceAgent.saveData(outState)
-            }
-        }
-    }
-
-    private fun switchToWaitForCarState() {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToWaitForCar
-        userAgent.lookAtWaitForCarArea()
-        lifecycleScope.launch {
-            serverAgent.listenCarDataChanged { carData ->
-                userAgent.lookAtWaitingTimeLabel(carData.waitingTimeMinutes)
-                val orderedCar = screenAgent.data.orderedCar
-                val characteristics =
-                    "${orderedCar?.carColor} ${orderedCar?.carModel} [${orderedCar?.carNumber}]"
-                userAgent.lookAtCarCharacteristics(characteristics)
-                userAgent.lookAtCarLocation(carData.carLocation)
-
-                val routeToMe = Route(
-                    startPlace = Place("carLocation", carData.carLocation),
-                    finishPlace = screenAgent.data.selectedRoute.startPlace
-                )
-                userAgent.lookAtRouteLine(routeToMe)
-            }
-        }
-    }
-
-    private fun switchToSearchCarState(service: Service) {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToSearchCar
-        var job: Job? = null
-        userAgent.lookAtSearchCarArea(onCancelClick = {
-            if (job?.isActive == true) {
-                job?.cancel()
-            }
-            switchToOrderServiceState(screenAgent.data.selectedRoute)
-        })
-        job = lifecycleScope.launch {
-            val response = serverAgent.postOrder(service)
-            if (response.success) {
-                screenAgent.data.orderedCar = response.car
-                switchToWaitForCarState()
-            } else {
-                userAgent.lookAtSearchResultMessage(response.message)
-            }
-        }
-    }
-
-    private fun switchToOrderServiceState(route: Route) {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
-        userAgent.lookAtRouteLine(screenAgent.data.selectedRoute)
-        userAgent.lookAtOrderArea()
-        userAgent.lookAtOrderRouteFields(route)
-
-        lifecycleScope.launch {
-            screenAgent.data.services = serverAgent.getServices()
-            userAgent.lookAtServices(screenAgent.data.services)
-            userAgent.lookAtOrderButton(
-                service = screenAgent.data.selectedService,
-                onOrderClick = { service ->
-                    switchToSearchCarState(service)
-                }
-            )
-        }
-    }
-
-    private fun switchToSelectRouteState() {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToSelectRoute
-
-        appAgent.lastLocation?.let { lastLocation ->
-            userAgent.lookAtYourLocation(lastLocation)
-
-        } ?: run {
-            userAgent.lookAtLocationDoNotAvailableMessage()
-        }
-
-        val placeName = screenAgent.data.selectedRoute.startPlace?.name
-            ?: "???"
-
-        val onSelectPlaceClick = {
-            selectRouteScreenAgent.startScreen(
-                route = screenAgent.data.selectedRoute,
-                onTheSelectRouteScreenResponse = { route ->
-                    if (route.startPlace != null && route.finishPlace != null) {
-                        switchToOrderServiceState(route)
-                    }
-                }
-            )
-        }
-        userAgent.lookAtStartPlaceLabel(
-            placeName = placeName,
-            onSelectPlaceClick = onSelectPlaceClick
-        )
-        userAgent.lookAtSelectRouteArea(onSelectPlaceClick)
-    }
-
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        deviceAgent.onCreateView.invoke()
-        binding = FragmentMainBinding.inflate(inflater)
-        return binding.root
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-        deviceAgent.onViewCreated.invoke(savedInstanceState)
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        deviceAgent.onSaveInstanceState.invoke(outState)
-        super.onSaveInstanceState(outState)
     }
 }
