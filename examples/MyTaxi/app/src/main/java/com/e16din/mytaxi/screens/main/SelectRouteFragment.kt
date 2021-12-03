@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -13,6 +14,7 @@ import com.e16din.mytaxi.server.Place
 import com.e16din.mytaxi.support.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.Serializable
 
@@ -38,39 +40,53 @@ class SelectRouteFragment : Fragment(), DataKey {
             // do nothing
         }
         deviceAgent.onViewCreated = { savedInstanceState ->
+            fun requestPlaces() {
+                lifecycleScope.launch {
+                    val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
+                    userAgent.lookAtPlacesList(places)
+                }
+            }
+
             screenAgent.data = deviceAgent.restoreData(savedInstanceState)
                 ?: SelectRouteScreenData(route = mainScreenAgent.getSelectedRoute())
 
             val route = screenAgent.data.route
             userAgent.lookAtStartPlace(route.startPlace?.name)
-            userAgent.onStartPlaceChanged = { place ->
-                screenAgent.data.route.startPlace = place
-                onAnyPlaceChanged(place.name)
-            }
-
             userAgent.lookAtFinishPlace(route.finishPlace?.name)
-            userAgent.onFinishPlaceChanged = { place ->
-                screenAgent.data.route.finishPlace = place
-                onAnyPlaceChanged(place.name)
+            userAgent.onSelectOtherField = { selectedFieldType ->
+                screenAgent.data.selectedFieldType = selectedFieldType
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
+                    launch(Dispatchers.Main) {
+                        userAgent.lookAtPlacesList(places)
+                    }
+                }
+            }
+            userAgent.onQueryChanged = { query ->
+                screenAgent.data.currentPlaceQuery = query
+                requestPlaces()
+            }
+            userAgent.onPlaceSelected = { place ->
+                if (screenAgent.data.selectedFieldType == SelectRouteScreenData.FieldType.From) {
+                    screenAgent.data.route.startPlace = place
+                    userAgent.lookAtStartPlace(place.name)
+                } else {
+                    screenAgent.data.route.finishPlace = place
+                    userAgent.lookAtFinishPlace(place.name)
+                }
+
+                screenAgent.data.currentPlaceQuery = place.name
+                val areAllPlacesSelected = screenAgent.data.route.finishPlace != null
+                        && screenAgent.data.route.startPlace != null
+                if (areAllPlacesSelected) {
+                    userAgent.lookAtMainScreen(screenAgent.data.route)
+                }
             }
 
-            lifecycleScope.launch {
-                val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
-                userAgent.lookAtPlacesList(places)
-            }
+            requestPlaces()
         }
         deviceAgent.onSaveInstanceState = { outState ->
             deviceAgent.saveData(outState)
-        }
-    }
-
-    private fun onAnyPlaceChanged(placeName: String) {
-        screenAgent.data.currentPlaceQuery = placeName
-
-        val areAllPlacesSelected = screenAgent.data.route.finishPlace != null
-                && screenAgent.data.route.startPlace != null
-        if (areAllPlacesSelected) {
-            userAgent.lookAtMainScreen(screenAgent.data.route)
         }
     }
 
@@ -99,8 +115,15 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     class SelectRouteScreenData(
         var route: Route,
-        var currentPlaceQuery: String = ""
-    ) : Serializable
+        var currentPlaceQuery: String = "",
+        var selectedFieldType: FieldType = when {
+            route.startPlace != null && route.finishPlace == null -> FieldType.From
+            route.startPlace == null && route.finishPlace != null -> FieldType.To
+            else -> FieldType.None
+        }
+    ) : Serializable {
+        enum class FieldType { None, From, To }
+    }
 
     // NOTE: агент для актора экрана Select Route
     inner class SelectRouteScreenAgent {
@@ -116,19 +139,46 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора реального пользователя
     inner class UserAgent {
-        lateinit var onStartPlaceChanged: (place: Place) -> Unit
-        lateinit var onFinishPlaceChanged: (place: Place) -> Unit //todo: use as parameter of function
+        lateinit var onPlaceSelected: (place: Place) -> Unit
+        lateinit var onSelectOtherField: (selectedFieldType: SelectRouteScreenData.FieldType) -> Unit
+        lateinit var onQueryChanged: (query: String) -> Unit
 
         fun lookAtStartPlace(name: String?) {
-            // todo
+            binding.startPlaceField.setText(name)
+            binding.startPlaceField.onFocusChangeListener =
+                View.OnFocusChangeListener { v, hasFocus ->
+                    if (hasFocus) {
+                        onSelectOtherField.invoke(SelectRouteScreenData.FieldType.From)
+                    }
+                }
+            binding.startPlaceField.doOnTextChanged { text, start, before, count ->
+                onQueryChanged.invoke(text.toString())
+            }
         }
 
         fun lookAtFinishPlace(name: String?) {
-            // todo
+            binding.finishPlaceField.setText(name)
+            binding.finishPlaceField.onFocusChangeListener =
+                View.OnFocusChangeListener { v, hasFocus ->
+                    if (hasFocus) {
+                        onSelectOtherField.invoke(SelectRouteScreenData.FieldType.To)
+                    }
+                }
+            binding.finishPlaceField.doOnTextChanged { text, start, before, count ->
+                onQueryChanged.invoke(text.toString())
+            }
         }
 
         fun lookAtPlacesList(places: List<Place>) {
-            // todo
+            if (binding.placesList.adapter == null) {
+                binding.placesList.adapter = PlacesAdapter(places) { selectedPlace ->
+                    onPlaceSelected.invoke(selectedPlace)
+                }
+            } else {
+                val placesAdapter = binding.placesList.adapter as PlacesAdapter
+                placesAdapter.places = places
+                placesAdapter.notifyDataSetChanged()
+            }
         }
 
         fun lookAtMainScreen(route: Route) {
@@ -141,8 +191,8 @@ class SelectRouteFragment : Fragment(), DataKey {
     inner class ServerAgent {
         private val httpClient by lazy { getApplication().httpClient() }
 
-        suspend fun getPlaces(currentPlaceQuery: String): List<Place> {
-            val url = "${HttpClient.GET_PLACES}?${HttpClient.PARAM_QUERY}=${currentPlaceQuery}"
+        suspend fun getPlaces(query: String): List<Place> {
+            val url = "${HttpClient.GET_PLACES}?${HttpClient.PARAM_QUERY}=${query}"
             return httpClient.get(url) {
                 accept(ContentType.Application.Json)
             }

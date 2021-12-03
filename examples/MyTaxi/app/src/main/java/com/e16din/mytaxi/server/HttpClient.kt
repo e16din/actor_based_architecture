@@ -32,10 +32,10 @@ object HttpClient {
     const val PARAM_QUERY = "query"
 
     // todo: replace with real addresses (where to get addresses?
-    private val places = listOf(// todo: add English Localization
-        Place("Тестовое место, 1", Place.Location(0.0, 0.0)),
-        Place("Тестовое место, 2", Place.Location(1.0, 1.0)),
-        Place("Тестовое место, 3", Place.Location(2.0, 2.0))
+    private var places = listOf(// todo: add English Localization
+        Place("Тестовое место, 1", "Город, Страна", Place.Location(0.0, 0.0)),
+        Place("Тестовое место, 2", "Город, Страна", Place.Location(1.0, 1.0)),
+        Place("Тестовое место, 3", "Город, Страна", Place.Location(2.0, 2.0))
     )
 
     // todo: replace stubs with data from server
@@ -47,6 +47,13 @@ object HttpClient {
                 when (HOST + request.url.encodedPath) {
                     GET_PLACES -> {
                         val query = request.url.parameters[PARAM_QUERY]
+
+                        places = listOf(// todo: add English Localization
+                            Place("${query}, 1", "Город, Страна", Place.Location(0.0, 0.0)),
+                            Place("${query}, 2", "Город, Страна", Place.Location(1.0, 1.0)),
+                            Place("${query}, 3", "Город, Страна", Place.Location(2.0, 2.0))
+                        )
+
                         val result = places
                         val resultJson =
                             Json.encodeToString(ListSerializer(Place.serializer()), result)

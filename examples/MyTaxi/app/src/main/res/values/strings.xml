@@ -10,4 +10,7 @@
     <string name="car_searching"><![CDATA[Поиск машины ->]]></string>
     <string name="cancel">Отмена</string>
     <string name="car_not_found_message">К сожалению машина не нашлась, попробуйте еще раз</string>
+    <string name="map">Карта</string>
+    <string name="from">Откуда</string>
+    <string name="to">Куда</string>
 </resources>

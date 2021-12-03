@@ -133,7 +133,7 @@ class MainFragment : Fragment(), DataKey {
                 userAgent.lookAtCarLocation(carData.carLocation)
 
                 val routeToMe = Route(
-                    startPlace = Place("carLocation", carData.carLocation),
+                    startPlace = Place("CarLocation", "Addition Info", carData.carLocation),
                     finishPlace = screenAgent.data.selectedRoute.startPlace
                 )
                 userAgent.lookAtRouteLine(routeToMe)
