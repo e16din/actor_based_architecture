@@ -46,13 +46,13 @@
 
 Если идти снаружи вглубь получится например так:
 
--- Пользователь
--- Сервер
--- Телефон и OS
-  -- Приложение
-    -- Экран авторизации
-    -- Главный экран
-    -- ...
+=> Пользователь</br>
+=> Сервер</br>
+=> Телефон и OS</br>
+&nbsp;&nbsp;&nbsp;&nbsp;=> Приложение</br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=> Экран авторизации</br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=> Главный экран</br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=> ...</br>
 
 Все это акторы - действующие лица.
 
@@ -61,6 +61,8 @@
 (Явное выделение акторов, кстати, дает исполнение принципа Single Responsibility из коробки, без лишних заморочек)
 
 Раньше большинство действующих лиц были за кадром, где-то там в головах разработчиков, менеджеров и бизнеса, а теперь мы моделируем бизнесс-процесс явно описывая взаимодействие всех акторов.
+
+### Подробнее про акторов
 
 Каждый экран по сути это актор. Он может взаимодействовать с пользователем который тоже актор - например экран показывает пользователю сообщение об ошибке, а пользователь жмет на кнопку "ок". 
 
@@ -71,6 +73,8 @@
 Один экран может взаимодействовать с другим экраном - например передавать или получать данные. 
 
 Само приложение это тоже актор, и любые экраны-акторы могут например сохранять/получать данные из приложения, или подписаться на какое-то глобальное событие.
+
+### Системный подход
 
 На такой акторный подход моделирования очень хорошо ложится теория систем, по сути мы явно описываем механизм взаимодействия систем которые учавствуют в работе приложения. 
 
@@ -97,58 +101,6 @@
 ```kotlin
 class MainFragment : Fragment(), DataKey {
 
-    // NOTE: агент для актора работающего приожения
-    inner class AppAgent {
-        // ...
-    }
-
-    @Serializable
-    class MainScreenData(
-        var bonusesCount: Int = 0,
-        var isSideBarOpened: Boolean = false,
-        var selectedRoute: Route = Route(),
-        var lastPlaces: List<Place> = emptyList(),
-        var services: List<Service> = emptyList(),
-        var selectedService: Service? = null,
-        var screenState: ScreenState = ScreenState.ToSelectRoute,
-        var orderedCar: OrderResult.Car? = null
-    ) : java.io.Serializable {
-
-        enum class ScreenState {
-            ToSelectRoute,
-            ToOrderService,
-            ToSearchCar, //todo: InProgress, Success, Fail
-            ToWaitForCar, //todo: Await, Done, Canceled
-            ToTrackTrip, //todo: Await, Done, Canceled
-            ToRateService //todo: add rate screen
-        }
-    }
-
-    // NOTE: агент для актора главного экрана
-    inner class MainScreenAgent {
-        lateinit var data: MainScreenData
-    }
-
-    // NOTE: агент для актора экрана выбора маршрута
-    inner class SelectRouteScreenAgent {
-        // ...
-    }
-
-    // NOTE: агент для актора пользователя
-    inner class UserAgent {
-        // ...
-    }
-
-    // NOTE: агент для актора сервера
-    inner class ServerAgent {
-        // ...
-    }
-
-    // NOTE: агент для актора операционной системы телефона
-    inner class SystemAgent {
-        // ...
-    }
-
     private val appAgent = AppAgent()
     private val screenAgent = MainScreenAgent()
     private val selectRouteScreenAgent = SelectRouteScreenAgent()
@@ -157,7 +109,6 @@ class MainFragment : Fragment(), DataKey {
     private val serverAgent = ServerAgent()
 
     private lateinit var binding: FragmentMainBinding
-
 
     init {
         systemAgent.onCreateView = {
@@ -226,6 +177,58 @@ class MainFragment : Fragment(), DataKey {
         }
     }
 
+    // NOTE: агент для актора работающего приожения
+    inner class AppAgent {
+        // ...
+    }
+
+    @Serializable
+    class MainScreenData(
+        var bonusesCount: Int = 0,
+        var isSideBarOpened: Boolean = false,
+        var selectedRoute: Route = Route(),
+        var lastPlaces: List<Place> = emptyList(),
+        var services: List<Service> = emptyList(),
+        var selectedService: Service? = null,
+        var screenState: ScreenState = ScreenState.ToSelectRoute,
+        var orderedCar: OrderResult.Car? = null
+    ) : java.io.Serializable {
+
+        enum class ScreenState {
+            ToSelectRoute,
+            ToOrderService,
+            ToSearchCar, //todo: InProgress, Success, Fail
+            ToWaitForCar, //todo: Await, Done, Canceled
+            ToTrackTrip, //todo: Await, Done, Canceled
+            ToRateService //todo: add rate screen
+        }
+    }
+
+    // NOTE: агент для актора главного экрана
+    inner class MainScreenAgent {
+        lateinit var data: MainScreenData
+    }
+
+    // NOTE: агент для актора экрана выбора маршрута
+    inner class SelectRouteScreenAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора пользователя
+    inner class UserAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора сервера
+    inner class ServerAgent {
+        // ...
+    }
+
+    // NOTE: агент для актора операционной системы телефона
+    inner class SystemAgent {
+        // ...
+    }
+
     // ...
 
     private fun switchToOrderServiceState(route: Route) {
@@ -264,7 +267,7 @@ class MainFragment : Fragment(), DataKey {
 
 Чтобы как-то называть новый подход, я придумал название - акторная архитектура, или Actor Based-Architecture.
 
-Этот подход дает ряд преимуществ: 
+### Этот подход дает ряд преимуществ: 
 
 - не надо городить огород с Clean Architecture;
 - не требуется гонять данные из класса в класс, можно убрать LiveData/Rx/Flow;
@@ -288,9 +291,13 @@ class MainFragment : Fragment(), DataKey {
 - логику взаимодействия акторов свободно можно шарить между платформами (останется только подставить реализацию);
 - легко и просто описывать реальное взаимодействие, а не воображаемые концепции
 
+- сводится к минимуму мэпинг данных и уходят классы моделей для разных слоев;
+- упрощается написание автотестов;
+
 - это ново, интересно и весело :)
 
-Минусы которые я вижу:
+### Минусы которые я вижу:
+
 - подход не привычный, отличается от всего того что мы привыкли использовать в проде; 
 - надо набивать руку, нарабатывать опыт; (что по своему приятно :))
 
