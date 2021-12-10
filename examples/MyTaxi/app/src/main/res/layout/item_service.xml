@@ -8,6 +8,7 @@
     android:background="@drawable/yellow_gray_rounded_shape"
     android:clickable="true"
     android:focusable="true"
+    android:layout_marginStart="12dp"
     android:alpha="1"
     android:orientation="vertical">
 

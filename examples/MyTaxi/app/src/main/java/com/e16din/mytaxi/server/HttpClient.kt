@@ -44,9 +44,9 @@ object HttpClient {
                         // todo: replace with real addresses (where to get addresses?
                         val result = if (!query.isNullOrBlank()) {
                             listOf(// todo: add English Localization
-                                Place("${query}, 1", "Город, Страна", Place.Location(0.0, 0.0)),
-                                Place("${query}, 2", "Город, Страна", Place.Location(1.0, 1.0)),
-                                Place("${query}, 3", "Город, Страна", Place.Location(2.0, 2.0))
+                                Place("${query}, 1", "Город, Страна", Place.Location(47.2313500, 39.7232800)),
+                                Place("${query}, 2", "Город, Страна", Place.Location(47.5313500, 39.7232800)),
+                                Place("${query}, 3", "Город, Страна", Place.Location(47.2313500, 39.1232800))
                             )
                         } else {
                             emptyList()

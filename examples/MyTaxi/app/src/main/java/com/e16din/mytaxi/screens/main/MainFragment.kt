@@ -26,6 +26,7 @@ import com.e16din.mytaxi.screens.main.screens.SelectRouteFragment
 import com.e16din.mytaxi.server.*
 import com.e16din.mytaxi.support.DataKey
 import com.e16din.mytaxi.support.getApplication
+import com.e16din.mytaxi.support.getNavigationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.SupportMapFragment
@@ -119,6 +120,13 @@ class MainFragment : Fragment(), DataKey {
                 deviceAgent.saveData(outState)
             }
         }
+
+        deviceAgent.onResume = {
+            val newRoute = getNavigationResult<Route>(SelectRouteFragment.KEY_RESULT_DATA)
+            newRoute?.let {
+                selectRouteScreenAgent.onRouteChanged.invoke(newRoute)
+            }
+        }
     }
 
     private fun switchToWaitForCarState() {
@@ -162,11 +170,17 @@ class MainFragment : Fragment(), DataKey {
         }
     }
 
-    private fun switchToOrderServiceState(route: Route) {
+    private fun switchToOrderServiceState(selectedRoute: Route) {
         screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
-        userAgent.lookAtRouteLine(screenAgent.data.selectedRoute)
-        userAgent.lookAtOrderArea()
-        userAgent.lookAtOrderRouteFields(route)
+        screenAgent.data.selectedRoute = selectedRoute
+        val startPlaceName = selectedRoute.startPlace?.name
+            ?: getString(R.string.default_start_place_name)
+        userAgent.lookAtStartPlaceLabel(startPlaceName)
+        userAgent.lookAtRouteLine(selectedRoute)
+        userAgent.lookAtOrderArea(onPlaceClick = {
+            selectRouteScreenAgent.startScreen(screenAgent.data.selectedRoute)
+        })
+        userAgent.lookAtOrderRouteFields(selectedRoute)
 
         lifecycleScope.launch {
             screenAgent.data.services = serverAgent.getServices()
@@ -191,23 +205,19 @@ class MainFragment : Fragment(), DataKey {
         }
 
         val placeName = screenAgent.data.selectedRoute.startPlace?.name
-            ?: "???"
+            ?: getString(R.string.default_start_place_name)
 
-        val onSelectPlaceClick = {
-            selectRouteScreenAgent.startScreen(
-                route = screenAgent.data.selectedRoute,
-                onTheSelectRouteScreenResponse = { route ->
-                    if (route.startPlace != null && route.finishPlace != null) {
-                        switchToOrderServiceState(route)
-                    }
+        userAgent.lookAtStartPlaceLabel(placeName)
+        userAgent.lookAtSelectRouteArea()
+
+        userAgent.onSelectPlaceClick = {
+            selectRouteScreenAgent.startScreen(screenAgent.data.selectedRoute)
+            selectRouteScreenAgent.onRouteChanged = { route ->
+                if (route.startPlace != null && route.finishPlace != null) {
+                    switchToOrderServiceState(route)
                 }
-            )
+            }
         }
-        userAgent.lookAtStartPlaceLabel(
-            placeName = placeName,
-            onSelectPlaceClick = onSelectPlaceClick
-        )
-        userAgent.lookAtSelectRouteArea(onSelectPlaceClick)
     }
 
     override fun onCreateView(
@@ -227,6 +237,11 @@ class MainFragment : Fragment(), DataKey {
     override fun onSaveInstanceState(outState: Bundle) {
         deviceAgent.onSaveInstanceState.invoke(outState)
         super.onSaveInstanceState(outState)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        deviceAgent.onResume.invoke()
     }
 
     // NOTE: агент для актора работающего приожения
@@ -294,26 +309,18 @@ class MainFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора экрана выбора маршрута
     inner class SelectRouteScreenAgent {
+        lateinit var onRouteChanged: (route: Route) -> Unit
 
-        fun startScreen(
-            route: Route,
-            onTheSelectRouteScreenResponse: (route: Route) -> Unit
-        ) {
-            val navController = findNavController()
-            val savedStateLiveData =
-                navController.currentBackStackEntry?.savedStateHandle?.getLiveData<Route>(
-                    SelectRouteFragment.KEY_RESULT_DATA
-                )
-            savedStateLiveData?.observe(viewLifecycleOwner) { newRoute ->
-                onTheSelectRouteScreenResponse.invoke(newRoute)
-            }
+        fun startScreen(route: Route) {
             val bundle = bundleOf(SelectRouteFragment.KEY_INITIAL_DATA to route)
-            navController.navigate(R.id.action_select_route_fragment, bundle)
+            findNavController().navigate(R.id.action_select_route_fragment, bundle)
         }
     }
 
     // NOTE: агент для актора реального пользователя
     inner class UserAgent {
+
+        lateinit var onSelectPlaceClick: () -> Unit
 
         fun lookAtYourLocation(location: Location) {
             val mapFragment =
@@ -370,14 +377,14 @@ class MainFragment : Fragment(), DataKey {
             }
         }
 
-        fun lookAtStartPlaceLabel(placeName: String, onSelectPlaceClick: () -> Unit) {
+        fun lookAtStartPlaceLabel(placeName: String) {
             binding.startPlaceLabel.text = placeName
             binding.selectStartPlaceButton.setOnClickListener {
                 onSelectPlaceClick.invoke()
             }
         }
 
-        fun lookAtSelectRouteArea(onSelectPlaceClick: () -> Unit) {
+        fun lookAtSelectRouteArea() {
             binding.selectRouteContainer.root.isVisible = true
             binding.selectRouteContainer.selectFinishPlaceButton.setOnClickListener {
                 onSelectPlaceClick.invoke()
@@ -443,21 +450,23 @@ class MainFragment : Fragment(), DataKey {
             }
         }
 
-        fun lookAtLocationDoNotAvailableMessage(thenDoIt: (() -> Unit)? = null) {
+        fun lookAtLocationDoNotAvailableMessage() {
             Toast.makeText(
                 requireContext(),
                 getString(R.string.location_do_not_available),
                 Toast.LENGTH_LONG
             ).show()
-            thenDoIt?.invoke()
         }
 
-        fun lookAtOrderArea() {
+        fun lookAtOrderArea(onPlaceClick: () -> Unit) {
             binding.orderContainer.root.isVisible = true
-
-            binding.orderContainer.root.isVisible = false
             binding.selectRouteContainer.root.isVisible = false
-            binding.selectStartPlaceButton.isVisible = false
+            binding.orderContainer.startPlaceButton.setOnClickListener {
+                onPlaceClick.invoke()
+            }
+            binding.orderContainer.finishPlaceButton.setOnClickListener {
+                onPlaceClick.invoke()
+            }
         }
 
         fun lookAtOrderRouteFields(route: Route) {
@@ -577,6 +586,7 @@ class MainFragment : Fragment(), DataKey {
         lateinit var onCreateView: () -> Unit
         lateinit var onViewCreated: (savedInstanceState: Bundle?) -> Unit
         lateinit var onSaveInstanceState: (outState: Bundle) -> Unit
+        lateinit var onResume: () -> Unit
 
         fun trackLocation(onLocationChanged: (Location?) -> Unit) {
             val locationClient =

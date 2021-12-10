@@ -13,4 +13,5 @@
     <string name="map">Карта</string>
     <string name="from">Откуда</string>
     <string name="to">Куда</string>
+    <string name="default_start_place_name">\???</string>
 </resources>
