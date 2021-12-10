@@ -1,14 +1,16 @@
-package com.e16din.mytaxi.screens.main
+package com.e16din.mytaxi.screens.main.screens
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.e16din.mytaxi.databinding.FragmentSelectRouteBinding
+import com.e16din.mytaxi.screens.main.Route
 import com.e16din.mytaxi.server.HttpClient
 import com.e16din.mytaxi.server.Place
 import com.e16din.mytaxi.support.*
@@ -40,50 +42,99 @@ class SelectRouteFragment : Fragment(), DataKey {
             // do nothing
         }
         deviceAgent.onViewCreated = { savedInstanceState ->
-            fun requestPlaces() {
-                lifecycleScope.launch {
-                    val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
-                    userAgent.lookAtPlacesList(places)
-                }
-            }
-
             screenAgent.data = deviceAgent.restoreData(savedInstanceState)
                 ?: SelectRouteScreenData(route = mainScreenAgent.getSelectedRoute())
 
+            fun updatePlaces(query: String) {
+                if (query.isBlank()) {
+                    userAgent.lookAtPlacesList(emptyList())
+
+                } else {
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val places = serverAgent.getPlaces(query)
+                        launch(Dispatchers.Main) {
+                            userAgent.lookAtPlacesList(places)
+                        }
+                    }
+                }
+            }
+
+            userAgent.onStartPlaceQueryChanged = { query ->
+                screenAgent.data.startPlaceQuery = query
+                updatePlaces(query)
+            }
+            userAgent.onFinishPlaceQueryChanged = { query ->
+                screenAgent.data.finishPlaceQuery = query
+                updatePlaces(query)
+            }
+
             val route = screenAgent.data.route
-            userAgent.lookAtStartPlace(route.startPlace?.name)
-            userAgent.lookAtFinishPlace(route.finishPlace?.name)
-            userAgent.onSelectOtherField = { selectedFieldType ->
-                screenAgent.data.selectedFieldType = selectedFieldType
+            route.startPlace?.let { place ->
+                userAgent.lookAtStartPlaceButton(place)
+
+            } ?: run {
+                userAgent.lookAtStartPlaceField("")
+            }
+
+            route.finishPlace?.let { place ->
+                userAgent.lookAtFinishPlaceButton(place)
+
+            } ?: run {
+                userAgent.lookAtFinishPlaceField("")
+            }
+
+            userAgent.lookAtPlacesList(emptyList())
+
+            userAgent.onStartPlaceClick = {
+                val startPlace = screenAgent.data.route.startPlace
+                userAgent.lookAtStartPlaceField(startPlace?.name)
+            }
+
+            userAgent.onFinishPlaceClick = {
+                val finishPlace = screenAgent.data.route.finishPlace
+                userAgent.lookAtFinishPlaceField(finishPlace?.name)
+            }
+
+            userAgent.onStartPlaceFieldSelected = {
+                screenAgent.data.selectedFieldType = SelectRouteScreenData.FieldType.Start
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val places = serverAgent.getPlaces(screenAgent.data.currentPlaceQuery)
+                    val places = serverAgent.getPlaces(screenAgent.data.startPlaceQuery)
                     launch(Dispatchers.Main) {
                         userAgent.lookAtPlacesList(places)
                     }
                 }
             }
-            userAgent.onQueryChanged = { query ->
-                screenAgent.data.currentPlaceQuery = query
-                requestPlaces()
+
+            userAgent.onFinishPlaceFieldSelected = {
+                screenAgent.data.selectedFieldType = SelectRouteScreenData.FieldType.Finish
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val places = serverAgent.getPlaces(screenAgent.data.startPlaceQuery)
+                    launch(Dispatchers.Main) {
+                        userAgent.lookAtPlacesList(places)
+                    }
+                }
             }
+
             userAgent.onPlaceSelected = { place ->
-                if (screenAgent.data.selectedFieldType == SelectRouteScreenData.FieldType.From) {
-                    screenAgent.data.route.startPlace = place
-                    userAgent.lookAtStartPlace(place.name)
-                } else {
-                    screenAgent.data.route.finishPlace = place
-                    userAgent.lookAtFinishPlace(place.name)
+                when (screenAgent.data.selectedFieldType) {
+                    SelectRouteScreenData.FieldType.Start,
+                    SelectRouteScreenData.FieldType.None -> {
+                        screenAgent.data.route.startPlace = place
+                        userAgent.lookAtStartPlaceButton(place)
+                    }
+                    SelectRouteScreenData.FieldType.Finish -> {
+                        screenAgent.data.route.finishPlace = place
+                        userAgent.lookAtFinishPlaceButton(place)
+                    }
                 }
 
-                screenAgent.data.currentPlaceQuery = place.name
+                screenAgent.data.startPlaceQuery = place.name
                 val areAllPlacesSelected = screenAgent.data.route.finishPlace != null
                         && screenAgent.data.route.startPlace != null
                 if (areAllPlacesSelected) {
                     userAgent.lookAtMainScreen(screenAgent.data.route)
                 }
             }
-
-            requestPlaces()
         }
         deviceAgent.onSaveInstanceState = { outState ->
             deviceAgent.saveData(outState)
@@ -115,14 +166,15 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     class SelectRouteScreenData(
         var route: Route,
-        var currentPlaceQuery: String = "",
+        var startPlaceQuery: String = "",
+        var finishPlaceQuery: String = "",
         var selectedFieldType: FieldType = when {
-            route.startPlace != null && route.finishPlace == null -> FieldType.From
-            route.startPlace == null && route.finishPlace != null -> FieldType.To
+            route.startPlace != null && route.finishPlace == null -> FieldType.Start
+            route.startPlace == null && route.finishPlace != null -> FieldType.Finish
             else -> FieldType.None
         }
     ) : Serializable {
-        enum class FieldType { None, From, To }
+        enum class FieldType { None, Start, Finish }
     }
 
     // NOTE: агент для актора экрана Select Route
@@ -140,32 +192,62 @@ class SelectRouteFragment : Fragment(), DataKey {
     // NOTE: агент для актора реального пользователя
     inner class UserAgent {
         lateinit var onPlaceSelected: (place: Place) -> Unit
-        lateinit var onSelectOtherField: (selectedFieldType: SelectRouteScreenData.FieldType) -> Unit
-        lateinit var onQueryChanged: (query: String) -> Unit
 
-        fun lookAtStartPlace(name: String?) {
-            binding.startPlaceField.setText(name)
+        lateinit var onStartPlaceClick: () -> Unit
+        lateinit var onStartPlaceFieldSelected: () -> Unit
+        lateinit var onStartPlaceQueryChanged: (query: String) -> Unit
+
+        lateinit var onFinishPlaceClick: () -> Unit
+        lateinit var onFinishPlaceFieldSelected: () -> Unit
+        lateinit var onFinishPlaceQueryChanged: (query: String) -> Unit
+
+        fun lookAtStartPlaceField(name: String?) {
+            binding.startPlaceButton.root.isVisible = false
+            binding.startPlaceField.isVisible = true
             binding.startPlaceField.onFocusChangeListener =
                 View.OnFocusChangeListener { v, hasFocus ->
                     if (hasFocus) {
-                        onSelectOtherField.invoke(SelectRouteScreenData.FieldType.From)
+                        onStartPlaceFieldSelected.invoke()
                     }
                 }
             binding.startPlaceField.doOnTextChanged { text, start, before, count ->
-                onQueryChanged.invoke(text.toString())
+                onStartPlaceQueryChanged.invoke(text.toString())
             }
+            binding.startPlaceField.setText(name)
         }
 
-        fun lookAtFinishPlace(name: String?) {
-            binding.finishPlaceField.setText(name)
+        fun lookAtFinishPlaceField(name: String?) {
+            binding.finishPlaceButton.root.isVisible = false
+            binding.finishPlaceField.isVisible = true
             binding.finishPlaceField.onFocusChangeListener =
                 View.OnFocusChangeListener { v, hasFocus ->
                     if (hasFocus) {
-                        onSelectOtherField.invoke(SelectRouteScreenData.FieldType.To)
+                        onFinishPlaceFieldSelected.invoke()
                     }
                 }
             binding.finishPlaceField.doOnTextChanged { text, start, before, count ->
-                onQueryChanged.invoke(text.toString())
+                onFinishPlaceQueryChanged.invoke(text.toString())
+            }
+            binding.finishPlaceField.setText(name)
+        }
+
+        fun lookAtFinishPlaceButton(place: Place) {
+            binding.finishPlaceField.isVisible = false
+            binding.finishPlaceButton.root.isVisible = true
+            binding.finishPlaceButton.nameLabel.text = place.name
+            binding.finishPlaceButton.additionLabel.text = place.addition
+            binding.finishPlaceButton.root.setOnClickListener {
+                onFinishPlaceClick.invoke()
+            }
+        }
+
+        fun lookAtStartPlaceButton(place: Place) {
+            binding.startPlaceField.isVisible = false
+            binding.startPlaceButton.root.isVisible = true
+            binding.startPlaceButton.nameLabel.text = place.name
+            binding.startPlaceButton.additionLabel.text = place.addition
+            binding.startPlaceButton.root.setOnClickListener {
+                onStartPlaceClick.invoke()
             }
         }
 

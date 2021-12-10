@@ -17,7 +17,7 @@
 
     <fragment
         android:id="@+id/selectRouteFragment"
-        android:name="com.e16din.mytaxi.screens.main.SelectRouteFragment"
+        android:name="com.e16din.mytaxi.screens.main.screens.SelectRouteFragment"
         android:label="SelectRouteFragment"
         tools:layout="@layout/fragment_select_route">
         <action

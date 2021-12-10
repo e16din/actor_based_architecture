@@ -1,4 +1,4 @@
-package com.e16din.mytaxi.screens.main
+package com.e16din.mytaxi.screens.main.screens
 
 import android.view.LayoutInflater
 import android.view.ViewGroup

@@ -31,13 +31,6 @@ object HttpClient {
     const val PARAM_COUNT = "count"
     const val PARAM_QUERY = "query"
 
-    // todo: replace with real addresses (where to get addresses?
-    private var places = listOf(// todo: add English Localization
-        Place("Тестовое место, 1", "Город, Страна", Place.Location(0.0, 0.0)),
-        Place("Тестовое место, 2", "Город, Страна", Place.Location(1.0, 1.0)),
-        Place("Тестовое место, 3", "Город, Страна", Place.Location(2.0, 2.0))
-    )
-
     // todo: replace stubs with data from server
     val instance = HttpClient(MockEngine) {
         engine {
@@ -48,13 +41,17 @@ object HttpClient {
                     GET_PLACES -> {
                         val query = request.url.parameters[PARAM_QUERY]
 
-                        places = listOf(// todo: add English Localization
-                            Place("${query}, 1", "Город, Страна", Place.Location(0.0, 0.0)),
-                            Place("${query}, 2", "Город, Страна", Place.Location(1.0, 1.0)),
-                            Place("${query}, 3", "Город, Страна", Place.Location(2.0, 2.0))
-                        )
+                        // todo: replace with real addresses (where to get addresses?
+                        val result = if (!query.isNullOrBlank()) {
+                            listOf(// todo: add English Localization
+                                Place("${query}, 1", "Город, Страна", Place.Location(0.0, 0.0)),
+                                Place("${query}, 2", "Город, Страна", Place.Location(1.0, 1.0)),
+                                Place("${query}, 3", "Город, Страна", Place.Location(2.0, 2.0))
+                            )
+                        } else {
+                            emptyList()
+                        }
 
-                        val result = places
                         val resultJson =
                             Json.encodeToString(ListSerializer(Place.serializer()), result)
                         respond(resultJson, HttpStatusCode.OK, responseHeaders)
@@ -65,8 +62,14 @@ object HttpClient {
                         respond(resultJson, HttpStatusCode.OK, responseHeaders)
                     }
                     GET_LAST_PLACES -> {
+                        // todo: replace with real addresses (where to get addresses?
+                        val lastPlaces = listOf(// todo: add English Localization
+                            Place("Последнее выбранное место, 1", "Город, Страна", Place.Location(0.0, 0.0)),
+                            Place("Последнее выбранное место, 2", "Город, Страна", Place.Location(1.0, 1.0)),
+                        )
+
                         val count = request.url.parameters[PARAM_COUNT]?.toInt()
-                        val result = count?.let { places.subList(0, it) } ?: emptyList()
+                        val result = count?.let { lastPlaces.subList(0, it) } ?: emptyList()
                         val resultJson =
                             Json.encodeToString(ListSerializer(Place.serializer()), result)
                         respond(resultJson, HttpStatusCode.OK, responseHeaders)
