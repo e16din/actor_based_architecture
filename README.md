@@ -3,24 +3,27 @@
 
 --------------------------
 
-[Статья с примером](article_with_example.md)
+- [Статья с примером (beta2 in progress)](article_with_example_beta2.md)
 
 Намерен порефакторить и выложить на целевых площадках - Habr, Medium
 
+[Пример Android-приложения - Игра Edible-Inedible (beta2)](https://github.com/e16din/actor_based_architecture/tree/main/examples/EdibleInedible)
+
+in progress..
+
 --------------------------
 
-[Пример Android-приложения - MyTaxi (см. папку example)](https://github.com/e16din/actor_based_architecture)
+- [Статья с примером (beta1)](article_with_example_beta1.md)
+
+[Пример Android-приложения - MyTaxi (beta1)](https://github.com/e16din/actor_based_architecture/tree/main/examples/MyTaxi)
 
 MyTaxi - это тестовое приложение для заказа такси.
 
 Код фрагментов удобнее читать с блока init {}, там точка входа
 
+(Проект частично не рабочий, на текущем этапе приостановлен)
+
 --------------------------
 
-Проект скорее всего не рабочий, потому как я только писал код и еще не запускал его
 
-Следующими шагами хочу:
-- дописать функционал, пройтись по todo
-- протестировать и отладить, довести до стабильного состояния
-- почистить код, убрать лишнее, прорефакторить
-- навести красоту в UI
+
