@@ -12,6 +12,9 @@
     <string name="car_not_found_message">К сожалению машина не нашлась, попробуйте еще раз</string>
     <string name="map">Карта</string>
     <string name="from">Откуда</string>
+    <string name="login">Логин (3 или более символов)</string>
+    <string name="password">Пароль (6 или более символов)</string>
     <string name="to">Куда</string>
     <string name="default_start_place_name">\???</string>
+    <string name="enter">Войти</string>
 </resources>

@@ -6,6 +6,18 @@
     app:startDestination="@+id/mainFragment">
 
     <fragment
+        android:id="@+id/authFragment"
+        android:name="com.e16din.mytaxi.screens.auth.AuthFragment"
+        android:label="AuthFragment"
+        tools:layout="@layout/fragment_auth">
+        <action
+            android:id="@+id/action_main_fragment"
+            app:destination="@+id/mainFragment"
+            app:popUpTo="@+id/mainFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
         android:id="@+id/mainFragment"
         android:name="com.e16din.mytaxi.screens.main.MainFragment"
         android:label="MainFragment"
@@ -13,6 +25,10 @@
         <action
             android:id="@+id/action_select_route_fragment"
             app:destination="@+id/selectRouteFragment" />
+
+        <action
+            android:id="@+id/action_auth_fragment"
+            app:destination="@+id/authFragment" />
     </fragment>
 
     <fragment

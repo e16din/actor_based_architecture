@@ -21,6 +21,7 @@ object HttpClient {
 
     const val HOST = "https://test.mytaxi.com"
 
+    const val POST_LOGIN = "$HOST/login"
     const val GET_PLACES = "$HOST/places"
     const val GET_BONUSES_COUNT = "$HOST/bonuses_count"
     const val GET_LAST_PLACES = "$HOST/last_places"
@@ -38,6 +39,10 @@ object HttpClient {
                 val responseHeaders =
                     headersOf(HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()))
                 when (HOST + request.url.encodedPath) {
+                    POST_LOGIN -> {
+                        val resultJson = Json.encodeToString(Boolean.serializer(), true)
+                        respond(resultJson, HttpStatusCode.OK, responseHeaders)
+                    }
                     GET_PLACES -> {
                         val query = request.url.parameters[PARAM_QUERY]
 

@@ -22,6 +22,7 @@ import androidx.navigation.fragment.findNavController
 import com.e16din.mytaxi.MyTaxiApp
 import com.e16din.mytaxi.R
 import com.e16din.mytaxi.databinding.FragmentMainBinding
+import com.e16din.mytaxi.screens.auth.AuthFragment
 import com.e16din.mytaxi.screens.main.screens.SelectRouteFragment
 import com.e16din.mytaxi.server.*
 import com.e16din.mytaxi.support.DataKey
@@ -47,8 +48,9 @@ import kotlinx.serialization.json.Json
 class MainFragment : Fragment(), DataKey {
 
     private val appAgent = AppAgent()
-    private val screenAgent = MainScreenAgent()
+    private val mainScreenAgent = MainScreenAgent()
     private val selectRouteScreenAgent = SelectRouteScreenAgent()
+    private val authScreenAgent = AuthScreenAgent()
     private val userAgent = UserAgent()
     private val deviceAgent = DeviceAgent()
     private val serverAgent = ServerAgent()
@@ -57,24 +59,31 @@ class MainFragment : Fragment(), DataKey {
 
     init {
         deviceAgent.onCreateView = {
+            if (!appAgent.isAuthorized) {
+                authScreenAgent.startScreen()
+                authScreenAgent.onSuccess = {
+                    switchToSelectRouteState()
+                }
+            }
+
             deviceAgent.trackLocation { location ->
                 appAgent.lastLocation = location
             }
         }
 
         deviceAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
+            mainScreenAgent.data = deviceAgent.restoreData(savedInstanceState)
                 ?: MainScreenData()
 
-            when (screenAgent.data.screenState) {
+            when (mainScreenAgent.data.screenState) {
                 MainScreenData.ScreenState.ToSelectRoute -> {
                     switchToSelectRouteState()
                 }
                 MainScreenData.ScreenState.ToOrderService -> {
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                    switchToOrderServiceState(mainScreenAgent.data.selectedRoute)
                 }
                 MainScreenData.ScreenState.ToSearchCar -> {
-                    screenAgent.data.selectedService?.let {
+                    mainScreenAgent.data.selectedService?.let {
                         switchToSearchCarState(it)
                     }
                 }
@@ -90,19 +99,19 @@ class MainFragment : Fragment(), DataKey {
             }
 
             userAgent.lookAtLeftSideBar(
-                enabled = screenAgent.data.isSideBarOpened,
+                enabled = mainScreenAgent.data.isSideBarOpened,
                 onSideBarStateChanged = { opened ->
-                    screenAgent.data.isSideBarOpened = opened
+                    mainScreenAgent.data.isSideBarOpened = opened
                 }
             )
 
             lifecycleScope.launch {
                 val lastPlaces = serverAgent.getLastPlaces(2)
-                    ?: screenAgent.data.lastPlaces
+                    ?: mainScreenAgent.data.lastPlaces
 
                 fun onLastPlaceClick(position: Int) {
-                    screenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
+                    mainScreenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
+                    switchToOrderServiceState(mainScreenAgent.data.selectedRoute)
                 }
 
                 userAgent.lookAtLastPlacesList(
@@ -111,9 +120,9 @@ class MainFragment : Fragment(), DataKey {
                     onLastPlace2Click = { onLastPlaceClick(1) }
                 )
 
-                screenAgent.data.bonusesCount = serverAgent.getBonusesCount()
-                    ?: screenAgent.data.bonusesCount
-                userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
+                mainScreenAgent.data.bonusesCount = serverAgent.getBonusesCount()
+                    ?: mainScreenAgent.data.bonusesCount
+                userAgent.lookAtBonusesCount(mainScreenAgent.data.bonusesCount)
             }
 
             deviceAgent.onSaveInstanceState = { outState ->
@@ -126,16 +135,21 @@ class MainFragment : Fragment(), DataKey {
             newRoute?.let {
                 selectRouteScreenAgent.onRouteChanged.invoke(newRoute)
             }
+
+            val isAuthSuccess = getNavigationResult<Boolean>(AuthFragment.KEY_RESULT_DATA)
+            if (isAuthSuccess == true) {
+                authScreenAgent.onSuccess.invoke()
+            }
         }
     }
 
     private fun switchToWaitForCarState() {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToWaitForCar
+        mainScreenAgent.data.screenState = MainScreenData.ScreenState.ToWaitForCar
         userAgent.lookAtWaitForCarArea()
         lifecycleScope.launch {
             serverAgent.listenCarDataChanged { carData ->
                 userAgent.lookAtWaitingTimeLabel(carData.waitingTimeMinutes)
-                val orderedCar = screenAgent.data.orderedCar
+                val orderedCar = mainScreenAgent.data.orderedCar
                 val characteristics =
                     "${orderedCar?.carColor} ${orderedCar?.carModel} [${orderedCar?.carNumber}]"
                 userAgent.lookAtCarCharacteristics(characteristics)
@@ -143,7 +157,7 @@ class MainFragment : Fragment(), DataKey {
 
                 val routeToMe = Route(
                     startPlace = Place("CarLocation", "Addition Info", carData.carLocation),
-                    finishPlace = screenAgent.data.selectedRoute.startPlace
+                    finishPlace = mainScreenAgent.data.selectedRoute.startPlace
                 )
                 userAgent.lookAtRouteLine(routeToMe)
             }
@@ -151,18 +165,18 @@ class MainFragment : Fragment(), DataKey {
     }
 
     private fun switchToSearchCarState(service: Service) {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToSearchCar
+        mainScreenAgent.data.screenState = MainScreenData.ScreenState.ToSearchCar
         var job: Job? = null
         userAgent.lookAtSearchCarArea(onCancelClick = {
             if (job?.isActive == true) {
                 job?.cancel()
             }
-            switchToOrderServiceState(screenAgent.data.selectedRoute)
+            switchToOrderServiceState(mainScreenAgent.data.selectedRoute)
         })
         job = lifecycleScope.launch {
             val response = serverAgent.postOrder(service)
             if (response.success) {
-                screenAgent.data.orderedCar = response.car
+                mainScreenAgent.data.orderedCar = response.car
                 switchToWaitForCarState()
             } else {
                 userAgent.lookAtSearchResultMessage(response.message)
@@ -171,22 +185,22 @@ class MainFragment : Fragment(), DataKey {
     }
 
     private fun switchToOrderServiceState(selectedRoute: Route) {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
-        screenAgent.data.selectedRoute = selectedRoute
+        mainScreenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
+        mainScreenAgent.data.selectedRoute = selectedRoute
         val startPlaceName = selectedRoute.startPlace?.name
             ?: getString(R.string.default_start_place_name)
         userAgent.lookAtStartPlaceLabel(startPlaceName)
         userAgent.lookAtRouteLine(selectedRoute)
         userAgent.lookAtOrderArea(onPlaceClick = {
-            selectRouteScreenAgent.startScreen(screenAgent.data.selectedRoute)
+            selectRouteScreenAgent.startScreen(mainScreenAgent.data.selectedRoute)
         })
         userAgent.lookAtOrderRouteFields(selectedRoute)
 
         lifecycleScope.launch {
-            screenAgent.data.services = serverAgent.getServices()
-            userAgent.lookAtServices(screenAgent.data.services)
+            mainScreenAgent.data.services = serverAgent.getServices()
+            userAgent.lookAtServices(mainScreenAgent.data.services)
             userAgent.lookAtOrderButton(
-                service = screenAgent.data.selectedService,
+                service = mainScreenAgent.data.selectedService,
                 onOrderClick = { service ->
                     switchToSearchCarState(service)
                 }
@@ -195,7 +209,7 @@ class MainFragment : Fragment(), DataKey {
     }
 
     private fun switchToSelectRouteState() {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToSelectRoute
+        mainScreenAgent.data.screenState = MainScreenData.ScreenState.ToSelectRoute
 
         appAgent.lastLocation?.let { lastLocation ->
             userAgent.lookAtYourLocation(lastLocation)
@@ -204,14 +218,14 @@ class MainFragment : Fragment(), DataKey {
             userAgent.lookAtLocationDoNotAvailableMessage()
         }
 
-        val placeName = screenAgent.data.selectedRoute.startPlace?.name
+        val placeName = mainScreenAgent.data.selectedRoute.startPlace?.name
             ?: getString(R.string.default_start_place_name)
 
         userAgent.lookAtStartPlaceLabel(placeName)
         userAgent.lookAtSelectRouteArea()
 
         userAgent.onSelectPlaceClick = {
-            selectRouteScreenAgent.startScreen(screenAgent.data.selectedRoute)
+            selectRouteScreenAgent.startScreen(mainScreenAgent.data.selectedRoute)
             selectRouteScreenAgent.onRouteChanged = { route ->
                 if (route.startPlace != null && route.finishPlace != null) {
                     switchToOrderServiceState(route)
@@ -246,17 +260,8 @@ class MainFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора работающего приожения
     inner class AppAgent {
-        var isAuthorized: Boolean = false // todo: use it on order the car
-            get() {
-                return sharedPreferences()
-                    .getBoolean(MyTaxiApp.KEY_IS_AUTHORIZED, field)
-            }
-            set(value) {
-                field = value
-                sharedPreferences()
-                    .edit().putBoolean(MyTaxiApp.KEY_IS_AUTHORIZED, value)
-                    .apply()
-            }
+        val isAuthorized: Boolean
+            get() = getApplication().isAuthorized
 
         var lastLocation: Location? = null
             get() {
@@ -305,6 +310,15 @@ class MainFragment : Fragment(), DataKey {
     // NOTE: агент для актора главного экрана
     inner class MainScreenAgent {
         lateinit var data: MainScreenData
+    }
+
+    // NOTE: агент для актора экрана авторизации
+    inner class AuthScreenAgent {
+        lateinit var onSuccess: () -> Unit
+
+        fun startScreen() {
+            findNavController().navigate(R.id.action_auth_fragment)
+        }
     }
 
     // NOTE: агент для актора экрана выбора маршрута
@@ -621,7 +635,7 @@ class MainFragment : Fragment(), DataKey {
         }
 
         fun saveData(bundle: Bundle) {
-            bundle.putSerializable(dataKey, screenAgent.data)
+            bundle.putSerializable(dataKey, mainScreenAgent.data)
         }
     }
 }

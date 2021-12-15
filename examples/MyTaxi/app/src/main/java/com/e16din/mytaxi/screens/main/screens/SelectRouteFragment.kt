@@ -24,12 +24,12 @@ import java.io.Serializable
 class SelectRouteFragment : Fragment(), DataKey {
 
     companion object {
-        const val KEY_INITIAL_DATA = "KEY_INITIAL_DATA"
-        const val KEY_RESULT_DATA = "KEY_DATA_RESULT"
+        val KEY_INITIAL_DATA = "${SelectRouteFragment::class.simpleName}_DATA"
+        val KEY_RESULT_DATA = "${SelectRouteFragment::class.simpleName}_RESULT"
     }
 
     private val appAgent = AppAgent()
-    private val screenAgent = SelectRouteScreenAgent()
+    private val selectRouteScreenAgent = SelectRouteScreenAgent()
     private val mainScreenAgent = MainScreenAgent()
     private val userAgent = UserAgent()
     private val deviceAgent = DeviceAgent()
@@ -42,8 +42,8 @@ class SelectRouteFragment : Fragment(), DataKey {
             // do nothing
         }
         deviceAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = deviceAgent.restoreData(savedInstanceState)
-                ?: SelectRouteScreenData(route = mainScreenAgent.getSelectedRoute())
+            selectRouteScreenAgent.data = deviceAgent.restoreData(savedInstanceState)
+                ?: SelectRouteScreenData(route = mainScreenAgent.getInitialData())
 
             fun updatePlaces(query: String) {
                 if (query.isBlank()) {
@@ -60,23 +60,23 @@ class SelectRouteFragment : Fragment(), DataKey {
             }
 
             userAgent.onStartPlaceQueryChanged = { query ->
-                screenAgent.data.startPlaceQuery = query
+                selectRouteScreenAgent.data.startPlaceQuery = query
                 updatePlaces(query)
             }
             userAgent.onFinishPlaceQueryChanged = { query ->
-                screenAgent.data.finishPlaceQuery = query
+                selectRouteScreenAgent.data.finishPlaceQuery = query
                 updatePlaces(query)
             }
 
-            val route = screenAgent.data.route
-            route.startPlace?.let { place ->
+            val initialRoute = selectRouteScreenAgent.data.route
+            initialRoute.startPlace?.let { place ->
                 userAgent.lookAtStartPlaceButton(place)
 
             } ?: run {
                 userAgent.lookAtStartPlaceField("")
             }
 
-            route.finishPlace?.let { place ->
+            initialRoute.finishPlace?.let { place ->
                 userAgent.lookAtFinishPlaceButton(place)
 
             } ?: run {
@@ -86,19 +86,20 @@ class SelectRouteFragment : Fragment(), DataKey {
             userAgent.lookAtPlacesList(emptyList())
 
             userAgent.onStartPlaceClick = {
-                val startPlace = screenAgent.data.route.startPlace
+                val startPlace = selectRouteScreenAgent.data.route.startPlace
                 userAgent.lookAtStartPlaceField(startPlace?.name)
             }
 
             userAgent.onFinishPlaceClick = {
-                val finishPlace = screenAgent.data.route.finishPlace
+                val finishPlace = selectRouteScreenAgent.data.route.finishPlace
                 userAgent.lookAtFinishPlaceField(finishPlace?.name)
             }
 
             userAgent.onStartPlaceFieldSelected = {
-                screenAgent.data.selectedFieldType = SelectRouteScreenData.FieldType.Start
+                selectRouteScreenAgent.data.selectedFieldType =
+                    SelectRouteScreenData.FieldType.Start
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val places = serverAgent.getPlaces(screenAgent.data.startPlaceQuery)
+                    val places = serverAgent.getPlaces(selectRouteScreenAgent.data.startPlaceQuery)
                     launch(Dispatchers.Main) {
                         userAgent.lookAtPlacesList(places)
                     }
@@ -106,9 +107,10 @@ class SelectRouteFragment : Fragment(), DataKey {
             }
 
             userAgent.onFinishPlaceFieldSelected = {
-                screenAgent.data.selectedFieldType = SelectRouteScreenData.FieldType.Finish
+                selectRouteScreenAgent.data.selectedFieldType =
+                    SelectRouteScreenData.FieldType.Finish
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val places = serverAgent.getPlaces(screenAgent.data.startPlaceQuery)
+                    val places = serverAgent.getPlaces(selectRouteScreenAgent.data.startPlaceQuery)
                     launch(Dispatchers.Main) {
                         userAgent.lookAtPlacesList(places)
                     }
@@ -116,23 +118,23 @@ class SelectRouteFragment : Fragment(), DataKey {
             }
 
             userAgent.onPlaceSelected = { place ->
-                when (screenAgent.data.selectedFieldType) {
+                when (selectRouteScreenAgent.data.selectedFieldType) {
                     SelectRouteScreenData.FieldType.Start,
                     SelectRouteScreenData.FieldType.None -> {
-                        screenAgent.data.route.startPlace = place
+                        selectRouteScreenAgent.data.route.startPlace = place
                         userAgent.lookAtStartPlaceButton(place)
                     }
                     SelectRouteScreenData.FieldType.Finish -> {
-                        screenAgent.data.route.finishPlace = place
+                        selectRouteScreenAgent.data.route.finishPlace = place
                         userAgent.lookAtFinishPlaceButton(place)
                     }
                 }
 
-                screenAgent.data.startPlaceQuery = place.name
-                val areAllPlacesSelected = screenAgent.data.route.finishPlace != null
-                        && screenAgent.data.route.startPlace != null
+                selectRouteScreenAgent.data.startPlaceQuery = place.name
+                val areAllPlacesSelected = selectRouteScreenAgent.data.route.finishPlace != null
+                        && selectRouteScreenAgent.data.route.startPlace != null
                 if (areAllPlacesSelected) {
-                    userAgent.lookAtMainScreen(screenAgent.data.route)
+                    mainScreenAgent.showScreen(selectRouteScreenAgent.data.route)
                 }
             }
         }
@@ -184,8 +186,13 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора экрана Main
     inner class MainScreenAgent {
-        fun getSelectedRoute(): Route {
+        fun getInitialData(): Route {
             return requireArguments().getSerializable(KEY_INITIAL_DATA) as Route
+        }
+
+        fun showScreen(route: Route) {
+            setNavigationResult(KEY_RESULT_DATA, route)
+            findNavController().popBackStack()
         }
     }
 
@@ -262,11 +269,6 @@ class SelectRouteFragment : Fragment(), DataKey {
                 placesAdapter.notifyDataSetChanged()
             }
         }
-
-        fun lookAtMainScreen(route: Route) {
-            setNavigationResult(KEY_RESULT_DATA, route)
-            findNavController().popBackStack()
-        }
     }
 
     // NOTE: агент для актора реального сервера
@@ -292,7 +294,7 @@ class SelectRouteFragment : Fragment(), DataKey {
         }
 
         fun saveData(outState: Bundle) {
-            outState.putSerializable(dataKey, screenAgent.data)
+            outState.putSerializable(dataKey, selectRouteScreenAgent.data)
         }
     }
 }

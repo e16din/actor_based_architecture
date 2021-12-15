@@ -14,13 +14,20 @@ class MyTaxiApp : Application(), DataKey {
         const val KEY_LAST_LOCATION = "KEY_LAST_LOCATION"
     }
 
+    var isAuthorized: Boolean = false
+        get() {
+            return sharedPreferences()
+                .getBoolean(KEY_IS_AUTHORIZED, field)
+        }
+        set(value) {
+            field = value
+            sharedPreferences()
+                .edit().putBoolean(KEY_IS_AUTHORIZED, value)
+                .apply()
+        }
+
     override fun onCreate() {
         super.onCreate()
-
-        // todo: add auth logic and remove this setter
-        sharedPreferences()
-            .edit().putBoolean(KEY_IS_AUTHORIZED, true)
-            .apply()
     }
 
     fun sharedPreferences(): SharedPreferences = getSharedPreferences(dataKey, Context.MODE_PRIVATE)
