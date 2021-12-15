@@ -4,17 +4,16 @@
 --------------------------
 
 - [Статья с примером (beta2 in progress)](article_with_example_beta2.md)
-- [Статья с примером (beta1)](article_with_example_beta1.md)
 
 Намерен порефакторить и выложить на целевых площадках - Habr, Medium
-
---------------------------
 
 [Пример Android-приложения - Игра Edible-Inedible (beta2)](https://github.com/e16din/actor_based_architecture/tree/main/examples/EdibleInedible)
 
 in progress..
 
 --------------------------
+
+- [Статья с примером (beta1)](article_with_example_beta1.md)
 
 [Пример Android-приложения - MyTaxi (beta1)](https://github.com/e16din/actor_based_architecture/tree/main/examples/MyTaxi)
 
@@ -25,5 +24,6 @@ MyTaxi - это тестовое приложение для заказа так
 (Проект частично не рабочий, на текущем этапе приостановлен)
 
 --------------------------
+
 
 
