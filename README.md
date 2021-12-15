@@ -7,7 +7,7 @@
 
 Намерен порефакторить и выложить на целевых площадках - Habr, Medium
 
-[Пример Android-приложения - Игра Edible-Inedible (beta2)](https://github.com/e16din/actor_based_architecture/tree/main/examples/EdibleInedible)
+[Пример Android-приложения - Игра Edible-Inedible (beta2)](https://github.com/e16din/actor_based_architecture/tree/main/examples/EdibleInedibleGame)
 
 in progress..
 
