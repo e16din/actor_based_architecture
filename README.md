@@ -3,8 +3,8 @@
 
 --------------------------
 
-[Статья с примером (beta2 in progress)](article_with_example_beta2.md)
-[Статья с примером (beta1)](article_with_example_beta1.md)
+- [Статья с примером (beta2 in progress)](article_with_example_beta2.md)
+- [Статья с примером (beta1)](article_with_example_beta1.md)
 
 Намерен порефакторить и выложить на целевых площадках - Habr, Medium
 
