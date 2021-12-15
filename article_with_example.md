@@ -88,162 +88,90 @@
 
 Грубо говоря в каждом фрагменте(активити) существует свой набор агентов, эти агенты содержат только необходимый функционал для взаимодействия акторов на этом фрагменте.
 
-Ниже привожу пример кода экрана приложения: 
+Привожу код экрана авторизации тестового приложения: 
 
-(//todo: похоже надо написать что-то более легковесное, чтобы акцентировать внимание на концепции, а не на логике приложения)
 
 ```kotlin
-class MainFragment : Fragment(), DataKey {
+class AuthFragment : Fragment(), DataKey {
+
+    companion object {
+        val KEY_IS_AUTH_SUCCESS = "${AuthFragment::class.simpleName}_IS_AUTH_SUCCESS"
+    }
 
     private val appAgent = AppAgent()
-    private val screenAgent = MainScreenAgent()
-    private val selectRouteScreenAgent = SelectRouteScreenAgent()
+    private val authScreenAgent = AuthScreenAgent()
+    private val mainScreenAgent = MainScreenAgent()
     private val userAgent = UserAgent()
-    private val systemAgent = SystemAgent()
+    private val deviceAgent = DeviceAgent()
     private val serverAgent = ServerAgent()
 
-    private lateinit var binding: FragmentMainBinding
+    private lateinit var binding: FragmentAuthBinding
 
     init {
-        systemAgent.onCreateView = {
-            systemAgent.trackLocation { location ->
-                appAgent.lastLocation = location
+        deviceAgent.onViewCreated = { savedInstanceState ->
+            authScreenAgent.data = deviceAgent.restoreData(savedInstanceState)
+                ?: AuthScreenData(false)
+
+            userAgent.lookAtLoginFields()
+            userAgent.onLoginDataChanged = { login, password ->
+                val isLoginDataCorrect = login.isNotBlank()
+                        && password.isNotBlank()
+                        && login.length >= 3
+                        && password.length >= 6
+                authScreenAgent.data.isLoginDataCorrect = isLoginDataCorrect
+                userAgent.lookAtEnterButton(isLoginDataCorrect)
             }
-        }
 
-        systemAgent.onViewCreated = { savedInstanceState ->
-            screenAgent.data = systemAgent.restoreData(savedInstanceState)
-                ?: MainScreenData()
+            userAgent.lookAtEnterButton(authScreenAgent.data.isLoginDataCorrect)
+            userAgent.onEnterClick = { login, password ->
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val isAuthSuccess = serverAgent.postLogin(login, password)
+                    appAgent.isAuthorized = isAuthSuccess
 
-            when (screenAgent.data.screenState) {
-                MainScreenData.ScreenState.ToSelectRoute -> {
-                    switchToSelectRouteState()
-                }
-                MainScreenData.ScreenState.ToOrderService -> {
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
-                }
-                MainScreenData.ScreenState.ToSearchCar -> {
-                    screenAgent.data.selectedService?.let {
-                        switchToSearchCarState(it)
+                    if (isAuthSuccess) {
+                        withContext(Dispatchers.Main) {
+                            mainScreenAgent.appear()
+                        }
                     }
                 }
-                MainScreenData.ScreenState.ToWaitForCar -> {
-                    switchToWaitForCarState()
-                }
-                MainScreenData.ScreenState.ToTrackTrip -> {
-                    // todo:
-                }
-                MainScreenData.ScreenState.ToRateService -> {
-                    // todo:
-                }
-            }
-
-            userAgent.lookAtLeftSideBar(
-                sidebarOpened = screenAgent.data.isSideBarOpened,
-                onSideBarStateChanged = { opened ->
-                    screenAgent.data.isSideBarOpened = opened
-                }
-            )
-
-            lifecycleScope.launch {
-                val lastPlaces = serverAgent.getLastPlaces(2)
-                    ?: screenAgent.data.lastPlaces
-
-                fun onLastPlaceClick(position: Int) {
-                    screenAgent.data.selectedRoute.finishPlace = lastPlaces[position]
-                    switchToOrderServiceState(screenAgent.data.selectedRoute)
-                }
-
-                userAgent.lookAtLastPlacesList(
-                    lastPlaces = lastPlaces,
-                    onLastPlace1Click = { onLastPlaceClick(0) },
-                    onLastPlace2Click = { onLastPlaceClick(1) }
-                )
-
-                screenAgent.data.bonusesCount = serverAgent.getBonusesCount()
-                    ?: screenAgent.data.bonusesCount
-                userAgent.lookAtBonusesCount(screenAgent.data.bonusesCount)
-            }
-
-            systemAgent.onSaveInstanceState = { outState ->
-                systemAgent.saveData(outState)
             }
         }
+        deviceAgent.onSaveInstanceState = { outState ->
+            deviceAgent.saveData(outState)
+        }
     }
+
+    // ...
 
     // NOTE: агент для актора работающего приожения
     inner class AppAgent {
         // ...
     }
 
-    @Serializable
-    class MainScreenData(
-        var bonusesCount: Int = 0,
-        var isSideBarOpened: Boolean = false,
-        var selectedRoute: Route = Route(),
-        var lastPlaces: List<Place> = emptyList(),
-        var services: List<Service> = emptyList(),
-        var selectedService: Service? = null,
-        var screenState: ScreenState = ScreenState.ToSelectRoute,
-        var orderedCar: OrderResult.Car? = null
-    ) : java.io.Serializable {
-
-        enum class ScreenState {
-            ToSelectRoute,
-            ToOrderService,
-            ToSearchCar, //todo: InProgress, Success, Fail
-            ToWaitForCar, //todo: Await, Done, Canceled
-            ToTrackTrip, //todo: Await, Done, Canceled
-            ToRateService //todo: add rate screen
-        }
+    // NOTE: агент для актора экрана авторизации
+    inner class AuthScreenAgent {
+        // ...
     }
 
     // NOTE: агент для актора главного экрана
     inner class MainScreenAgent {
-        lateinit var data: MainScreenData
-    }
-
-    // NOTE: агент для актора экрана выбора маршрута
-    inner class SelectRouteScreenAgent {
         // ...
     }
 
-    // NOTE: агент для актора пользователя
+    // NOTE: агент для актора реального пользователя
     inner class UserAgent {
         // ...
     }
 
-    // NOTE: агент для актора сервера
+    // NOTE: агент для актора реального сервера
     inner class ServerAgent {
         // ...
     }
 
-    // NOTE: агент для актора операционной системы телефона
-    inner class SystemAgent {
+    // NOTE: агент для актора устройства
+    inner class DeviceAgent {
         // ...
     }
-
-    // ...
-
-    private fun switchToOrderServiceState(route: Route) {
-        screenAgent.data.screenState = MainScreenData.ScreenState.ToOrderService
-        userAgent.lookAtRouteLine(screenAgent.data.selectedRoute)
-        userAgent.lookAtOrderArea()
-        userAgent.lookAtOrderRouteFields(route)
-
-        lifecycleScope.launch {
-            screenAgent.data.services = serverAgent.getServices()
-            userAgent.lookAtServices(screenAgent.data.services)
-            userAgent.lookAtOrderButton(
-                service = screenAgent.data.selectedService,
-                onOrderClick = { service ->
-                    switchToSearchCarState(service)
-                }
-            )
-        }
-    }
-
-    // ...
 }
 ```
 
