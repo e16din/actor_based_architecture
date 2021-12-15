@@ -182,7 +182,7 @@ class AuthFragment : Fragment(), DataKey {
 Если присмотреться то получается довольно чистая архитектура, где каждая функция представляет собой UseCase :)
 
 
-Весь код примера можете посмотреть [здесь](https://github.com/e16din/mobile_subject_oriented_programming/blob/main/example/app/src/main/java/com/e16din/mytaxi/screens/main/MainFragment.kt)
+Весь код примера можете посмотреть [здесь](https://github.com/e16din/actor_based_architecture/blob/main/examples/MyTaxi/app/src/main/java/com/e16din/mytaxi/screens/auth/AuthFragment.kt)
 (еще в работе, все самое главное есть и можно смотреть на код)
 
 ### Системный, декларативный, ООП
@@ -251,7 +251,7 @@ class AuthFragment : Fragment(), DataKey {
 
 Буду рад если этот подход сделает процесс разработки более простым и удобным для всех нас :)
 
-Призываю открыть репозиторий и поиграться с новым подходом.
+Призываю открыть репозиторий и поиграться с новым подходом: https://github.com/e16din/actor_based_architecture/tree/main/examples/MyTaxi/app/src/main/java/com/e16din/mytaxi
 
 Обратную связь пишите в комментариях и issues. 
 
