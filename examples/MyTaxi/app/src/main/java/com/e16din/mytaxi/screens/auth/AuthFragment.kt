@@ -24,7 +24,7 @@ import kotlinx.serialization.Serializable
 class AuthFragment : Fragment(), DataKey {
 
     companion object {
-        val KEY_RESULT_DATA = "${AuthFragment::class.simpleName}_RESULT"
+        val KEY_SUCCESS = "${AuthFragment::class.simpleName}_SUCCESS"
     }
 
     private val appAgent = AppAgent()
@@ -59,7 +59,7 @@ class AuthFragment : Fragment(), DataKey {
 
                     if (isAuthSuccess) {
                         withContext(Dispatchers.Main) {
-                            mainScreenAgent.showScreen(isAuthSuccess)
+                            mainScreenAgent.appear()
                         }
                     }
                 }
@@ -107,8 +107,8 @@ class AuthFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора главного экрана
     inner class MainScreenAgent {
-        fun showScreen(isAuthSuccess: Boolean) {
-            setNavigationResult(KEY_RESULT_DATA, isAuthSuccess)
+        fun appear() {
+            setNavigationResult(KEY_SUCCESS, true)
             findNavController().popBackStack()
         }
     }

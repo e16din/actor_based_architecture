@@ -60,7 +60,7 @@ class MainFragment : Fragment(), DataKey {
     init {
         deviceAgent.onCreateView = {
             if (!appAgent.isAuthorized) {
-                authScreenAgent.startScreen()
+                authScreenAgent.appear()
                 authScreenAgent.onSuccess = {
                     switchToSelectRouteState()
                 }
@@ -131,12 +131,12 @@ class MainFragment : Fragment(), DataKey {
         }
 
         deviceAgent.onResume = {
-            val newRoute = getNavigationResult<Route>(SelectRouteFragment.KEY_RESULT_DATA)
+            val newRoute = getNavigationResult<Route>(SelectRouteFragment.KEY_RESULT_ROUTE)
             newRoute?.let {
                 selectRouteScreenAgent.onRouteChanged.invoke(newRoute)
             }
 
-            val isAuthSuccess = getNavigationResult<Boolean>(AuthFragment.KEY_RESULT_DATA)
+            val isAuthSuccess = getNavigationResult<Boolean>(AuthFragment.KEY_SUCCESS)
             if (isAuthSuccess == true) {
                 authScreenAgent.onSuccess.invoke()
             }
@@ -192,7 +192,7 @@ class MainFragment : Fragment(), DataKey {
         userAgent.lookAtStartPlaceLabel(startPlaceName)
         userAgent.lookAtRouteLine(selectedRoute)
         userAgent.lookAtOrderArea(onPlaceClick = {
-            selectRouteScreenAgent.startScreen(mainScreenAgent.data.selectedRoute)
+            selectRouteScreenAgent.appear(mainScreenAgent.data.selectedRoute)
         })
         userAgent.lookAtOrderRouteFields(selectedRoute)
 
@@ -225,7 +225,7 @@ class MainFragment : Fragment(), DataKey {
         userAgent.lookAtSelectRouteArea()
 
         userAgent.onSelectPlaceClick = {
-            selectRouteScreenAgent.startScreen(mainScreenAgent.data.selectedRoute)
+            selectRouteScreenAgent.appear(mainScreenAgent.data.selectedRoute)
             selectRouteScreenAgent.onRouteChanged = { route ->
                 if (route.startPlace != null && route.finishPlace != null) {
                     switchToOrderServiceState(route)
@@ -316,7 +316,7 @@ class MainFragment : Fragment(), DataKey {
     inner class AuthScreenAgent {
         lateinit var onSuccess: () -> Unit
 
-        fun startScreen() {
+        fun appear() {
             findNavController().navigate(R.id.action_auth_fragment)
         }
     }
@@ -325,8 +325,8 @@ class MainFragment : Fragment(), DataKey {
     inner class SelectRouteScreenAgent {
         lateinit var onRouteChanged: (route: Route) -> Unit
 
-        fun startScreen(route: Route) {
-            val bundle = bundleOf(SelectRouteFragment.KEY_INITIAL_DATA to route)
+        fun appear(route: Route) {
+            val bundle = bundleOf(SelectRouteFragment.KEY_INITIAL_ROUTE to route)
             findNavController().navigate(R.id.action_select_route_fragment, bundle)
         }
     }

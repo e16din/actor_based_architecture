@@ -24,8 +24,8 @@ import java.io.Serializable
 class SelectRouteFragment : Fragment(), DataKey {
 
     companion object {
-        val KEY_INITIAL_DATA = "${SelectRouteFragment::class.simpleName}_DATA"
-        val KEY_RESULT_DATA = "${SelectRouteFragment::class.simpleName}_RESULT"
+        val KEY_INITIAL_ROUTE = "${SelectRouteFragment::class.simpleName}_INITIAL_ROUTE"
+        val KEY_RESULT_ROUTE = "${SelectRouteFragment::class.simpleName}_RESULT_ROUTE"
     }
 
     private val appAgent = AppAgent()
@@ -43,7 +43,7 @@ class SelectRouteFragment : Fragment(), DataKey {
         }
         deviceAgent.onViewCreated = { savedInstanceState ->
             selectRouteScreenAgent.data = deviceAgent.restoreData(savedInstanceState)
-                ?: SelectRouteScreenData(route = mainScreenAgent.getInitialData())
+                ?: SelectRouteScreenData(route = mainScreenAgent.getRoute())
 
             fun updatePlaces(query: String) {
                 if (query.isBlank()) {
@@ -134,7 +134,7 @@ class SelectRouteFragment : Fragment(), DataKey {
                 val areAllPlacesSelected = selectRouteScreenAgent.data.route.finishPlace != null
                         && selectRouteScreenAgent.data.route.startPlace != null
                 if (areAllPlacesSelected) {
-                    mainScreenAgent.showScreen(selectRouteScreenAgent.data.route)
+                    mainScreenAgent.appear(selectRouteScreenAgent.data.route)
                 }
             }
         }
@@ -186,12 +186,12 @@ class SelectRouteFragment : Fragment(), DataKey {
 
     // NOTE: агент для актора экрана Main
     inner class MainScreenAgent {
-        fun getInitialData(): Route {
-            return requireArguments().getSerializable(KEY_INITIAL_DATA) as Route
+        fun getRoute(): Route {
+            return requireArguments().getSerializable(KEY_INITIAL_ROUTE) as Route
         }
 
-        fun showScreen(route: Route) {
-            setNavigationResult(KEY_RESULT_DATA, route)
+        fun appear(route: Route) {
+            setNavigationResult(KEY_RESULT_ROUTE, route)
             findNavController().popBackStack()
         }
     }
